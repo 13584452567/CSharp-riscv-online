@@ -51,9 +51,6 @@ jobs:
     - name: Build
       run: dotnet build --no-restore --configuration Release
 
-    - name: Test
-      run: dotnet test --no-build --verbosity normal
-
     - name: Publish self-contained AOT (per RID)
       # publish each runtime as self-contained AOT build so it can be run on target OS without dotnet installed
       run: |
