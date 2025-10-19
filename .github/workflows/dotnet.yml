@@ -14,6 +14,10 @@ on:
         description: 'Comma-separated list of files or globs to upload after publish (relative to repo root). Default: publish directory for each runtime.'
         required: false
         default: ''
+      project-path:
+        description: 'Path to the project (.csproj) to publish (relative to repo root).'
+        required: false
+        default: 'RiscVAssembler/RiscVAssembler.csproj'
 
 jobs:
   build:
@@ -55,13 +59,9 @@ jobs:
       # publish each runtime as self-contained AOT build so it can be run on target OS without dotnet installed
       run: |
         set -e
-        PROJECT=$(dotnet sln list | sed -n '2p' || true)
-        # If project not found from sln, fallback to known project path
-        if [ -z "$PROJECT" ]; then
-          PROJECT="RiscVAssembler/RiscVAssembler.csproj"
-        fi
-        echo "Publishing project: $PROJECT for RID=${{ matrix.rid }} (AOT)"
-        dotnet publish "$PROJECT" -c Release -r ${{ matrix.rid }} --self-contained true -p:PublishAot=true -p:PublishTrimmed=true -o "$GITHUB_WORKSPACE/artifacts/${{ matrix.rid }}"
+        PROJECT_PATH="${{ github.event.inputs.project-path }}"
+        echo "Publishing project: $PROJECT_PATH for RID=${{ matrix.rid }} (AOT)"
+        dotnet publish "$PROJECT_PATH" -c Release -r ${{ matrix.rid }} --self-contained true -p:PublishAot=true -p:PublishTrimmed=true -o "$GITHUB_WORKSPACE/artifacts/${{ matrix.rid }}"
       shell: bash
 
     - name: Prepare upload list
