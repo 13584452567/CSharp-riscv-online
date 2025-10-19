@@ -1,0 +1,12 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "test RiscVAssembler.Tests",
+			"type": "shell",
+			"command": "dotnet test \"d:\\Source Code\\riscv-online\\RiscVOnline\\RiscVAssembler.Tests\\RiscVAssembler.Tests.csproj\"",
+			"isBackground": false,
+			"group": "build"
+		}
+	]
+}

@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="RiscVAssembler/RiscVAssembler.csproj" />
+  <Project Path="RiscVAssembler.Tests/RiscVAssembler.Tests.csproj" />
+</Solution>
