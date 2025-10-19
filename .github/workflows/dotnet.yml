@@ -66,6 +66,13 @@ jobs:
         echo "CC=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
         echo "CXX=aarch64-linux-gnu-g++" >> $GITHUB_ENV
         echo "LD=aarch64-linux-gnu-ld" >> $GITHUB_ENV
+        # Ensure objcopy/strip point to the aarch64 cross tools so objcopy recognizes aarch64 binaries
+        if command -v aarch64-linux-gnu-objcopy >/dev/null 2>&1; then
+          sudo ln -sf "$(command -v aarch64-linux-gnu-objcopy)" /usr/local/bin/objcopy || true
+        fi
+        if command -v aarch64-linux-gnu-strip >/dev/null 2>&1; then
+          sudo ln -sf "$(command -v aarch64-linux-gnu-strip)" /usr/local/bin/strip || true
+        fi
       shell: bash
 
     - name: Publish self-contained AOT (per RID)
@@ -73,6 +80,10 @@ jobs:
       run: |
         set -e
         PROJECT_PATH="${{ github.event.inputs.project-path }}"
+        # fallback to default when not provided (push/pull_request triggers)
+        if [ -z "$PROJECT_PATH" ]; then
+          PROJECT_PATH="RiscVAssembler/RiscVAssembler.csproj"
+        fi
         echo "Publishing project: $PROJECT_PATH for RID=${{ matrix.rid }} (AOT)"
         dotnet publish "$PROJECT_PATH" -c Release -r ${{ matrix.rid }} --self-contained true -p:PublishAot=true -p:PublishTrimmed=true -o "$GITHUB_WORKSPACE/artifacts/${{ matrix.rid }}"
       shell: bash
