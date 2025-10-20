@@ -125,6 +125,16 @@ public class RvdAdditionalTests
         w.Length.Should().Be(1);
         var expected = InstructionBuilder.BuildFpR4Type(Opcodes.MADD, 10u, 11u, 12u, 13u, 0u);
         w[0].Should().Be(expected);
+        // Also assert important fixed fields (opcode/function selector):
+        // fmadd.d uses MADD opcode; fixed fields include bits 26..25=1, bits 6..2=0x10, bits 1..0=3
+        uint maskFm = 0u; uint matchFm = 0u;
+        // bits 26..25
+        maskFm |= 0b11u << 25; matchFm |= (0b01u << 25);
+        // bits 6..2
+        maskFm |= 0b11111u << 2; matchFm |= (0x10u << 2);
+        // bits 1..0
+        maskFm |= 0b11u << 0; matchFm |= (0b11u << 0);
+        AssertMaskMatch(w[0], maskFm, matchFm);
     }
 
     [Fact]
@@ -150,5 +160,16 @@ public class RvdAdditionalTests
         w4.Length.Should().Be(1);
         var expected4 = Opcodes.OP_FP | (8u << 7) | (0u << 12) | (9u << 15) | (1u << 20) | (Fpu.FCVT_D_L << 25);
         w4[0].Should().Be(expected4);
+        // Check fixed fields for OP_FP-based FCVT.L/D encodings: funct7, opcode low fields
+        uint maskL = 0u; uint matchL = 0u;
+        // funct7 bits 31..25
+        maskL |= 0b1111111u << 25; matchL |= (Fpu.FCVT_L_D << 25);
+        // bits 6..2 (OP_FP funct) and bits 1..0
+        maskL |= 0b11111u << 2; matchL |= (0x14u << 2);
+        maskL |= 0b11u << 0; matchL |= (0b11u << 0);
+        AssertMaskMatch(w[0], maskL, matchL);
+        AssertMaskMatch(w2[0], maskL, matchL);
+        AssertMaskMatch(w3[0], maskL, matchL);
+        AssertMaskMatch(w4[0], maskL, matchL);
     }
 }

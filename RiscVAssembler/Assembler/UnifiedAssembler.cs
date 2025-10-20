@@ -15,6 +15,9 @@ public class UnifiedAssembler
         Register(new RvaAssembler());
         Register(new RvfAssembler());
         Register(new RvcAssembler());
+        Register(new RvmAssembler());
+        Register(new RvvAssembler());
+        Register(new PseudoAssembler());
     }
 
     public void Register(IRiscVAssemblerModule module)

@@ -12,6 +12,8 @@ public class UnifiedDisassembler
         _modules.Add(new Rv64iModule());
         _modules.Add(new RvaModule(xlen));
         _modules.Add(new RvfModule());
+        _modules.Add(new RvmModule(xlen));
+        _modules.Add(new RvvModule());
         _modules.Add(new RvzicsrModule());
     }
 

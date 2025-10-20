@@ -34,5 +34,8 @@ public static class Opcodes
     public const uint NMSUB = 0b1001011;
     public const uint NMADD = 0b1001111;
 
+    // Vector instructions (V extension)
+    public const uint OP_V = 0b1010111;
+
     public static bool IsLoadInstruction(uint opcode) => opcode == LOAD;
 }

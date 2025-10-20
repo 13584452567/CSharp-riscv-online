@@ -65,6 +65,7 @@ public class RvfAssembler : IRiscVAssemblerModule
             { "fcvt.w.d",  i => new[] { AssembleFpCvti(i, Fpu.FCVT_W_D, isUnsigned:false) } },
             { "fcvt.wu.d", i => new[] { AssembleFpCvti(i, Fpu.FCVT_W_D, isUnsigned:true) } },
             { "fcvt.d.w",  i => new[] { AssembleFpCvts(i, Fpu.FCVT_D_W, isFromUnsigned:false) } },
+            { "fcvt.d.wu", i => new[] { AssembleFpCvts(i, Fpu.FCVT_D_W, isFromUnsigned:true) } },
             { "fclass.d", i => new[] { AssembleFpClassDouble(i) } },
             // additional D-extension conversions / moves
             { "fmv.x.d", i => new[] { AssembleFpMoveDouble(i, toInt:true) } },
