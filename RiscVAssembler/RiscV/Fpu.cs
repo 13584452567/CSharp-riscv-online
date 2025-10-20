@@ -31,6 +31,29 @@ public static class Fpu
     public const uint FMV_D_X  = 0b1111001;
     public const uint FCLASS_D = 0b1110001;
 
+    // FP conversions between single and double (assumed funct7 values)
+    // These follow the project's pattern of 'D' variants being odd vs 'S' even.
+    // From riscv-opcodes (rv_d): fcvt.s.d has 31..27=0x08 with 26..25=0 for S/D variants;
+    // fcvt.s.d (fcvt.s.d) uses 31..27=0x08 and bit25..31 mapping yields funct7 = 0b0001000 (0x08)
+    // fcvt.d.s uses 31..27=0x08 but with 26..25=1 -> funct7 has low bit set (0x09)
+    public const uint FCVT_S_D = 0b0001000; // 0x08
+    public const uint FCVT_D_S = 0b0001001; // 0x09
+
+    // Comparison selectors for floating-point comparisons (use in funct3/rm fields as project pattern)
+    // We'll use the existing FSGNJ/FMINMAX pattern and reserve selectors for comparisons
+    // (these values are used as funct3 selector in BuildFpRTypeGeneric variants)
+    public const uint FCMP_EQ = 0b000u; // feq
+    public const uint FCMP_LT = 0b001u; // flt
+    public const uint FCMP_LE = 0b010u; // fle
+
+    // 64-bit integer conversion funct7 placeholders (assumed values following pattern)
+    // From riscv-opcodes (rv64_d / rv64_f): fcvt.l.d uses 31..27=0x18 for the fcvt.l family
+    // 31..27=0x18 -> funct7 bits [31..25] = 0b11000x?; mapping lower bits from 26..25
+    // For fcvt.l.d (24..20=2) the documented 31..27=0x18 corresponds to funct7 = 0b1100000 (0x60)
+    // For fcvt.d.l the 31..27=0x1A corresponds to funct7 = 0b1101001 (0x69) for D variants
+    public const uint FCVT_L_D  = 0b1100000; // 0x60
+    public const uint FCVT_D_L  = 0b1101001; // 0x69
+
     // Fused multiply-add opcodes (R4-type)
     public const uint MADD_S  = 0b1000011;
     public const uint MSUB_S  = 0b1000111;

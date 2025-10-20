@@ -66,6 +66,25 @@ public class RvfAssembler : IRiscVAssemblerModule
             { "fcvt.wu.d", i => new[] { AssembleFpCvti(i, Fpu.FCVT_W_D, isUnsigned:true) } },
             { "fcvt.d.w",  i => new[] { AssembleFpCvts(i, Fpu.FCVT_D_W, isFromUnsigned:false) } },
             { "fclass.d", i => new[] { AssembleFpClassDouble(i) } },
+            // additional D-extension conversions / moves
+            { "fmv.x.d", i => new[] { AssembleFpMoveDouble(i, toInt:true) } },
+            { "fmv.d.x", i => new[] { AssembleFpMoveDouble(i, toInt:false) } },
+            { "fcvt.s.d", i => new[] { AssembleFpConvertSD(i) } },
+            { "fcvt.d.s", i => new[] { AssembleFpConvertDS(i) } },
+            // conversions between single/double and 64-bit integers
+            { "fcvt.l.s",  i => new[] { AssembleFpCvti64FromS(i, Fpu.FCVT_L_D, isUnsigned:false) } },
+            { "fcvt.lu.s", i => new[] { AssembleFpCvti64FromS(i, Fpu.FCVT_L_D, isUnsigned:true) } },
+            { "fcvt.s.l",  i => new[] { AssembleFpCvtsToSFrom64(i, Fpu.FCVT_D_L, isFromUnsigned:false) } },
+            { "fcvt.s.lu", i => new[] { AssembleFpCvtsToSFrom64(i, Fpu.FCVT_D_L, isFromUnsigned:true) } },
+            // comparisons
+            { "feq.d", i => new[] { AssembleFpCompare(i, Fpu.FCMP_EQ) } },
+            { "flt.d", i => new[] { AssembleFpCompare(i, Fpu.FCMP_LT) } },
+            { "fle.d", i => new[] { AssembleFpCompare(i, Fpu.FCMP_LE) } },
+            // 64-bit integer conversions
+            { "fcvt.l.d",  i => new[] { AssembleFpCvti64(i, Fpu.FCVT_L_D, isUnsigned:false) } },
+            { "fcvt.lu.d", i => new[] { AssembleFpCvti64(i, Fpu.FCVT_L_D, isUnsigned:true) } },
+            { "fcvt.d.l",  i => new[] { AssembleFpCvts64(i, Fpu.FCVT_D_L, isFromUnsigned:false) } },
+            { "fcvt.d.lu", i => new[] { AssembleFpCvts64(i, Fpu.FCVT_D_L, isFromUnsigned:true) } },
         };
     }
 
@@ -277,5 +296,99 @@ public class RvfAssembler : IRiscVAssemblerModule
         uint rd = ParseGpr(i.Operands[0]);
         uint rs1 = ParseFpr(i.Operands[1]);
         return InstructionBuilder.BuildFpRType(Fpu.FCLASS_D, 0, rd, rs1, 0, 0);
+    }
+
+    private static uint AssembleFpCompare(Instruction i, uint selector)
+    {
+        // form: feq.d rd, fs1, fs2
+        if (i.Operands.Length < 3) throw new ArgumentException("FP compare requires rd, fs1, fs2");
+        uint rd = ParseGpr(i.Operands[0]);
+        uint rs1 = ParseFpr(i.Operands[1]);
+        uint rs2 = ParseFpr(i.Operands[2]);
+        // place selector in funct3/rm-like field
+        return InstructionBuilder.BuildFpRType(Fpu.FSGNJ_D, selector, rd, rs1, rs2, 0);
+    }
+
+    private static uint AssembleFpCvti64(Instruction i, uint funct7, bool isUnsigned)
+    {
+        // fcvt.l.d rd, fs1
+        if (i.Operands.Length < 2) throw new ArgumentException("fcvt.l.d requires rd, fs1");
+        uint rd = ParseGpr(i.Operands[0]);
+        uint rs1 = ParseFpr(i.Operands[1]);
+        uint rm = i.Operands.Length >= 3 ? Fpu.RmFromString(i.Operands[2]) : 0u;
+        uint rs2 = isUnsigned ? 0b00001u : 0b00000u;
+        return Opcodes.OP_FP | (rd << 7) | (rm << 12) | (rs1 << 15) | (rs2 << 20) | (funct7 << 25);
+    }
+
+    private static uint AssembleFpCvts64(Instruction i, uint funct7, bool isFromUnsigned)
+    {
+        // fcvt.d.l fd, rs1
+        if (i.Operands.Length < 2) throw new ArgumentException("fcvt.d.l requires fd, rs1");
+        uint rd = ParseFpr(i.Operands[0]);
+        uint rs1 = ParseGpr(i.Operands[1]);
+        uint rm = i.Operands.Length >= 3 ? Fpu.RmFromString(i.Operands[2]) : 0u;
+        uint rs2 = isFromUnsigned ? 0b00001u : 0b00000u;
+        return Opcodes.OP_FP | (rd << 7) | (rm << 12) | (rs1 << 15) | (rs2 << 20) | (funct7 << 25);
+    }
+
+    private static uint AssembleFpCvti64FromS(Instruction i, uint funct7, bool isUnsigned)
+    {
+        // fcvt.l.s rd, fs1
+        if (i.Operands.Length < 2) throw new ArgumentException("fcvt.l.s requires rd, fs1");
+        uint rd = ParseGpr(i.Operands[0]);
+        uint rs1 = ParseFpr(i.Operands[1]);
+        uint rm = i.Operands.Length >= 3 ? Fpu.RmFromString(i.Operands[2]) : 0u;
+        uint rs2 = isUnsigned ? 0b00001u : 0b00000u;
+        return Opcodes.OP_FP | (rd << 7) | (rm << 12) | (rs1 << 15) | (rs2 << 20) | (funct7 << 25);
+    }
+
+    private static uint AssembleFpCvtsToSFrom64(Instruction i, uint funct7, bool isFromUnsigned)
+    {
+        // fcvt.s.l fd, rs1
+        if (i.Operands.Length < 2) throw new ArgumentException("fcvt.s.l requires fd, rs1");
+        uint rd = ParseFpr(i.Operands[0]);
+        uint rs1 = ParseGpr(i.Operands[1]);
+        uint rm = i.Operands.Length >= 3 ? Fpu.RmFromString(i.Operands[2]) : 0u;
+        uint rs2 = isFromUnsigned ? 0b00001u : 0b00000u;
+        return Opcodes.OP_FP | (rd << 7) | (rm << 12) | (rs1 << 15) | (rs2 << 20) | (funct7 << 25);
+    }
+
+    private static uint AssembleFpMoveDouble(Instruction i, bool toInt)
+    {
+        // fmv.x.d rd<GPR>, rs1<FPR>
+        // fmv.d.x rd<FPR>, rs1<GPR>
+        if (i.Operands.Length < 2) throw new ArgumentException("FMV requires two operands");
+        if (toInt)
+        {
+            uint rd = ParseGpr(i.Operands[0]);
+            uint rs1 = ParseFpr(i.Operands[1]);
+            return InstructionBuilder.BuildFpRType(Fpu.FMV_X_D, 0, rd, rs1, 0, 0);
+        }
+        else
+        {
+            uint rd = ParseFpr(i.Operands[0]);
+            uint rs1 = ParseGpr(i.Operands[1]);
+            return InstructionBuilder.BuildFpRType(Fpu.FMV_D_X, 0, rd, rs1, 0, 0);
+        }
+    }
+
+    private static uint AssembleFpConvertSD(Instruction i)
+    {
+        // fcvt.s.d fd, fs1[, rm]
+        if (i.Operands.Length < 2) throw new ArgumentException("fcvt.s.d requires fd, fs1[, rm]");
+        uint rd = ParseFpr(i.Operands[0]);
+        uint rs1 = ParseFpr(i.Operands[1]);
+        uint rm = i.Operands.Length >= 3 ? Fpu.RmFromString(i.Operands[2]) : 0u;
+        return InstructionBuilder.BuildFpRType(Fpu.FCVT_S_D, 0, rd, rs1, 0, rm);
+    }
+
+    private static uint AssembleFpConvertDS(Instruction i)
+    {
+        // fcvt.d.s fd, fs1[, rm]
+        if (i.Operands.Length < 2) throw new ArgumentException("fcvt.d.s requires fd, fs1[, rm]");
+        uint rd = ParseFpr(i.Operands[0]);
+        uint rs1 = ParseFpr(i.Operands[1]);
+        uint rm = i.Operands.Length >= 3 ? Fpu.RmFromString(i.Operands[2]) : 0u;
+        return InstructionBuilder.BuildFpRType(Fpu.FCVT_D_S, 0, rd, rs1, 0, rm);
     }
 }

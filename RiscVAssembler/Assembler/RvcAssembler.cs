@@ -19,6 +19,11 @@ public class RvcAssembler : IRiscVAssemblerModule
             { "c.sw", i => new[] { AssembleCSw(i) } },
             { "c.ld", i => new[] { AssembleCLd(i) } },
             { "c.sd", i => new[] { AssembleCSd(i) } },
+            // compressed floating-point (single/double)
+            { "c.flw", i => new[] { AssembleCFlw(i) } },
+            { "c.fsw", i => new[] { AssembleCFsw(i) } },
+            { "c.fld", i => new[] { AssembleCFld(i) } },
+            { "c.fsd", i => new[] { AssembleCFsd(i) } },
 
             // Quadrant 1
             { "c.nop", i => new[] { AssembleCNoOpOrAddi(i) } },
@@ -47,6 +52,10 @@ public class RvcAssembler : IRiscVAssemblerModule
             { "c.swsp", i => new[] { AssembleCSwSp(i) } },
             { "c.ldsp", i => new[] { AssembleCLdSp(i) } },
             { "c.sdsp", i => new[] { AssembleCSdSp(i) } },
+            { "c.flwsp", i => new[] { AssembleCFlwSp(i) } },
+            { "c.fswsp", i => new[] { AssembleCFswSp(i) } },
+            { "c.fldsp", i => new[] { AssembleCFldSp(i) } },
+            { "c.fsdsp", i => new[] { AssembleCFsdSp(i) } },
             { "c.jr", i => new[] { AssembleCJrJalrMvAdd(i) } },
             { "c.jalr", i => new[] { AssembleCJrJalrMvAdd(i) } },
             { "c.mv", i => new[] { AssembleCJrJalrMvAdd(i) } },
@@ -334,6 +343,43 @@ public class RvcAssembler : IRiscVAssemblerModule
         return w;
     }
 
+    // Quadrant 0: c.flw rd', uimm(rs1')  (funct3=010) - same encoding as c.lw but operands are FPRs
+    private static uint AssembleCFlw(Instruction ins)
+    {
+        if (ins.Operands.Length != 2) throw new ArgumentException("c.flw requires rd', uimm(rs1')");
+        // Accept fpr names for destination
+        uint fd = ParseFprPrime(ins.Operands[0]);
+        var (rs1p, uimm) = ParseMemPrime(ins.Operands[1]);
+        // Use same bit placements as CLw but destination is encoded in rd' field
+        ushort w = 0;
+        w |= (ushort)(0b010 << 13);
+        w |= (ushort)((fd & 0x7) << 2);
+        w |= (ushort)(rs1p << 7);
+        w |= (ushort)(((uimm >> 2) & 0x1) << 6);
+        w |= (ushort)(((uimm >> 3) & 0x7) << 10);
+        w |= (ushort)(((uimm >> 6) & 0x1) << 5);
+        w |= 0b00;
+        return w;
+    }
+
+    // Quadrant 0: c.fsw rs2', uimm(rs1')  (funct3=110) - same encoding as c.sw but operands are FPRs
+    private static uint AssembleCFsw(Instruction ins)
+    {
+        if (ins.Operands.Length != 2) throw new ArgumentException("c.fsw requires rs2', uimm(rs1')");
+        uint fs2 = ParseFprPrime(ins.Operands[0]);
+        var (rs1p, uimm) = ParseMemPrime(ins.Operands[1]);
+        ushort w = 0;
+        w |= (ushort)(0b110 << 13);
+        w |= (ushort)((fs2 & 0x7) << 2);
+        w |= (ushort)(rs1p << 7);
+        w |= (ushort)(((uimm >> 2) & 0x1) << 6);
+        w |= (ushort)(((uimm >> 3) & 0x7) << 10);
+        w |= (ushort)(((uimm >> 6) & 0x1) << 5);
+        w |= 0b00;
+        return w;
+    }
+
+
     // Quadrant 0: c.ld rd', uimm(rs1') (funct3=011)
     private static uint AssembleCLd(Instruction ins)
     {
@@ -345,6 +391,38 @@ public class RvcAssembler : IRiscVAssemblerModule
         w |= (ushort)(rd << 2);
         w |= (ushort)(rs1p << 7);
         // uimm[5:3] -> ins[12:10], uimm[7:6] -> ins[6:5]
+        w |= (ushort)(((uimm >> 3) & 0x7) << 10);
+        w |= (ushort)(((uimm >> 6) & 0x3) << 5);
+        w |= 0b00;
+        return w;
+    }
+
+    // Quadrant 0: c.fld rd', uimm(rs1')  (funct3=011) - double-precision load into FPR prime
+    private static uint AssembleCFld(Instruction ins)
+    {
+        if (ins.Operands.Length != 2) throw new ArgumentException("c.fld requires rd', uimm(rs1')");
+        uint fd = ParseFprPrime(ins.Operands[0]);
+        var (rs1p, uimm) = ParseMemPrime(ins.Operands[1]);
+        ushort w = 0;
+        w |= (ushort)(0b011 << 13);
+        w |= (ushort)((fd & 0x7) << 2);
+        w |= (ushort)(rs1p << 7);
+        w |= (ushort)(((uimm >> 3) & 0x7) << 10);
+        w |= (ushort)(((uimm >> 6) & 0x3) << 5);
+        w |= 0b00;
+        return w;
+    }
+
+    // Quadrant 0: c.fsd rs2', uimm(rs1')  (funct3=111) - double-precision store from FPR prime
+    private static uint AssembleCFsd(Instruction ins)
+    {
+        if (ins.Operands.Length != 2) throw new ArgumentException("c.fsd requires rs2', uimm(rs1')");
+        uint fs2 = ParseFprPrime(ins.Operands[0]);
+        var (rs1p, uimm) = ParseMemPrime(ins.Operands[1]);
+        ushort w = 0;
+        w |= (ushort)(0b111 << 13);
+        w |= (ushort)((fs2 & 0x7) << 2);
+        w |= (ushort)(rs1p << 7);
         w |= (ushort)(((uimm >> 3) & 0x7) << 10);
         w |= (ushort)(((uimm >> 6) & 0x3) << 5);
         w |= 0b00;
@@ -423,6 +501,61 @@ public class RvcAssembler : IRiscVAssemblerModule
         return w;
     }
 
+    // Quadrant 2: c.flwsp rd, uimm(sp) (funct3=010) - like clwsp but destination is FPR
+    private static uint AssembleCFlwSp(Instruction ins)
+    {
+        if (ins.Operands.Length != 2) throw new ArgumentException("c.flwsp requires rd, uimm(sp)");
+        uint fd = ParseFpr(ins.Operands[0]);
+        if (fd == 0) throw new ArgumentException("c.flwsp fd cannot be f0/invalid");
+        int uimm = ParseMemSp(ins.Operands[1]);
+        ushort w = 0;
+        w |= (ushort)(0b010 << 13);
+        w |= (ushort)((fd & 0x1F) << 7);
+        w |= (ushort)(((uimm >> 5) & 0x1) << 12);
+        w |= (ushort)(((uimm >> 2) & 0x7) << 4);
+        w |= (ushort)(((uimm >> 6) & 0x3) << 2);
+        w |= 0b10; // quadrant 2
+        return w;
+    }
+
+    // Quadrant 2: c.fswsp rs2, uimm(sp) (funct3=110) - like c.swsp but operand is FPR
+    private static uint AssembleCFswSp(Instruction ins)
+    {
+        if (ins.Operands.Length != 2) throw new ArgumentException("c.fswsp requires rs2, uimm(sp)");
+        uint fs2 = ParseFpr(ins.Operands[0]);
+        int uimm = ParseMemSp(ins.Operands[1]);
+        ushort w = 0;
+        w |= (ushort)(0b110 << 13);
+        w |= (ushort)((fs2 & 0x1F) << 2);
+        w |= (ushort)(((uimm >> 2) & 0xF) << 9);
+        w |= (ushort)(((uimm >> 6) & 0x3) << 7);
+        w |= 0b10; // quadrant 2
+        return w;
+    }
+
+    // FPR parsing helpers (support names like f0..f31 and aliases ft0/fs0 etc.)
+    private static uint ParseFpr(string s)
+    {
+        s = s.ToLower();
+        if (s.StartsWith("f") && uint.TryParse(s[1..], out var n)) { if (n>31) throw new ArgumentException(); return n; }
+        return s switch {
+            "ft0"=>0,"ft1"=>1,"ft2"=>2,"ft3"=>3,"ft4"=>4,"ft5"=>5,"ft6"=>6,"ft7"=>7,
+            "fs0"=>8,"fs1"=>9,
+            "fa0"=>10,"fa1"=>11,"fa2"=>12,"fa3"=>13,"fa4"=>14,"fa5"=>15,
+            "fa6"=>16,"fa7"=>17,
+            "fs2"=>18,"fs3"=>19,"fs4"=>20,"fs5"=>21,"fs6"=>22,"fs7"=>23,
+            "fs8"=>24,"fs9"=>25,"fs10"=>26,"fs11"=>27,
+            "ft8"=>28,"ft9"=>29,"ft10"=>30,"ft11"=>31,
+            _=>throw new ArgumentException($"Unknown fpr {s}")};
+    }
+
+    private static uint ParseFprPrime(string reg)
+    {
+        uint r = ParseFpr(reg);
+        if (r < 8 || r > 15) throw new ArgumentException("RVC prime fregs must be fs0..fs7 (f8..f15)");
+        return r - 8;
+    }
+
     // Quadrant 2: c.swsp rs2, uimm(sp) (funct3=110)
     private static uint AssembleCSwSp(Instruction ins)
     {
@@ -453,6 +586,38 @@ public class RvcAssembler : IRiscVAssemblerModule
         w |= (ushort)(((uimm >> 5) & 0x1) << 12);
         w |= (ushort)(((uimm >> 3) & 0x3) << 5);
         w |= (ushort)(((uimm >> 6) & 0x7) << 2);
+        w |= 0b10; // quadrant 2
+        return w;
+    }
+
+    // Quadrant 2: c.fldsp rd, uimm(sp) (funct3=011) - double-precision load into FPR
+    private static uint AssembleCFldSp(Instruction ins)
+    {
+        if (ins.Operands.Length != 2) throw new ArgumentException("c.fldsp requires rd, uimm(sp)");
+        uint fd = ParseFpr(ins.Operands[0]);
+        if (fd == 0) throw new ArgumentException("c.fldsp fd cannot be f0/invalid");
+        int uimm = ParseMemSp(ins.Operands[1]);
+        ushort w = 0;
+        w |= (ushort)(0b011 << 13);
+        w |= (ushort)((fd & 0x1F) << 7);
+        w |= (ushort)(((uimm >> 5) & 0x1) << 12);
+        w |= (ushort)(((uimm >> 3) & 0x3) << 5);
+        w |= (ushort)(((uimm >> 6) & 0x7) << 2);
+        w |= 0b10; // quadrant 2
+        return w;
+    }
+
+    // Quadrant 2: c.fsdsp rs2, uimm(sp) (funct3=111) - double-precision store from FPR
+    private static uint AssembleCFsdSp(Instruction ins)
+    {
+        if (ins.Operands.Length != 2) throw new ArgumentException("c.fsdsp requires rs2, uimm(sp)");
+        uint fs2 = ParseFpr(ins.Operands[0]);
+        int uimm = ParseMemSp(ins.Operands[1]);
+        ushort w = 0;
+        w |= (ushort)(0b111 << 13);
+        w |= (ushort)((fs2 & 0x1F) << 2);
+        w |= (ushort)(((uimm >> 3) & 0x7) << 10);
+        w |= (ushort)(((uimm >> 6) & 0x7) << 7);
         w |= 0b10; // quadrant 2
         return w;
     }
