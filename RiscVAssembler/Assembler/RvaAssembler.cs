@@ -12,13 +12,13 @@ public class RvaAssembler : IRiscVAssemblerModule
     _handlers = new(StringComparer.OrdinalIgnoreCase)
         {
             // lr/sc
-            { "lr.w",  i => new[] { AssembleAmo(i, funct5:0b00010, aq:false, rl:false, funct3:0b010, rs2Zero:true) } },
-            { "sc.w",  i => new[] { AssembleAmo(i, funct5:0b00011, aq:false, rl:false, funct3:0b010) } },
-            { "lr.d",  i => new[] { AssembleAmo(i, funct5:0b00010, aq:false, rl:false, funct3:0b011, rs2Zero:true) } },
-            { "sc.d",  i => new[] { AssembleAmo(i, funct5:0b00011, aq:false, rl:false, funct3:0b011) } },
+            { "lr.w",  i => new[] { AssembleAmoWithFlags(i, 0b00010, 0b010, rs2Zero:true) } },
+            { "sc.w",  i => new[] { AssembleAmoWithFlags(i, 0b00011, 0b010) } },
+            { "lr.d",  i => new[] { AssembleAmoWithFlags(i, 0b00010, 0b011, rs2Zero:true) } },
+            { "sc.d",  i => new[] { AssembleAmoWithFlags(i, 0b00011, 0b011) } },
 
             // amoxxx.w
-            { "amoswap.w", i => new[] { AssembleAmo(i, 0b00001, false, false, 0b010) } },
+            { "amoswap.w", i => new[] { AssembleAmoWithFlags(i, 0b00001, 0b010) } },
             { "amoadd.w",  i => new[] { AssembleAmo(i, 0b00000, false, false, 0b010) } },
             { "amoxor.w",  i => new[] { AssembleAmo(i, 0b00100, false, false, 0b010) } },
             { "amoand.w",  i => new[] { AssembleAmo(i, 0b01100, false, false, 0b010) } },
@@ -29,15 +29,15 @@ public class RvaAssembler : IRiscVAssemblerModule
             { "amomaxu.w", i => new[] { AssembleAmo(i, 0b11100, false, false, 0b010) } },
 
             // amoxxx.d
-            { "amoswap.d", i => new[] { AssembleAmo(i, 0b00001, false, false, 0b011) } },
-            { "amoadd.d",  i => new[] { AssembleAmo(i, 0b00000, false, false, 0b011) } },
-            { "amoxor.d",  i => new[] { AssembleAmo(i, 0b00100, false, false, 0b011) } },
-            { "amoand.d",  i => new[] { AssembleAmo(i, 0b01100, false, false, 0b011) } },
-            { "amoor.d",   i => new[] { AssembleAmo(i, 0b01000, false, false, 0b011) } },
-            { "amomin.d",  i => new[] { AssembleAmo(i, 0b10000, false, false, 0b011) } },
-            { "amomax.d",  i => new[] { AssembleAmo(i, 0b10100, false, false, 0b011) } },
-            { "amominu.d", i => new[] { AssembleAmo(i, 0b11000, false, false, 0b011) } },
-            { "amomaxu.d", i => new[] { AssembleAmo(i, 0b11100, false, false, 0b011) } },
+            { "amoswap.d", i => new[] { AssembleAmoWithFlags(i, 0b00001, 0b011) } },
+            { "amoadd.d",  i => new[] { AssembleAmoWithFlags(i, 0b00000, 0b011) } },
+            { "amoxor.d",  i => new[] { AssembleAmoWithFlags(i, 0b00100, 0b011) } },
+            { "amoand.d",  i => new[] { AssembleAmoWithFlags(i, 0b01100, 0b011) } },
+            { "amoor.d",   i => new[] { AssembleAmoWithFlags(i, 0b01000, 0b011) } },
+            { "amomin.d",  i => new[] { AssembleAmoWithFlags(i, 0b10000, 0b011) } },
+            { "amomax.d",  i => new[] { AssembleAmoWithFlags(i, 0b10100, 0b011) } },
+            { "amominu.d", i => new[] { AssembleAmoWithFlags(i, 0b11000, 0b011) } },
+            { "amomaxu.d", i => new[] { AssembleAmoWithFlags(i, 0b11100, 0b011) } },
         };
     }
 
@@ -73,6 +73,18 @@ public class RvaAssembler : IRiscVAssemblerModule
             rs2 = ParseGpr(i.Operands[2]);
         }
         return InstructionBuilder.BuildAmo(funct5, aq, rl, funct3, rd, rs1, rs2);
+    }
+
+    // Wrap AssembleAmo and detect .aq/.rl suffixes in the mnemonic
+    private static uint AssembleAmoWithFlags(Instruction i, uint funct5, uint funct3, bool rs2Zero=false)
+    {
+        var mnemonic = i.Mnemonic.ToLower();
+        bool aq = mnemonic.EndsWith(".aq");
+        bool rl = mnemonic.EndsWith(".rl");
+        bool aqrl = mnemonic.EndsWith(".aqrl") || mnemonic.EndsWith(".rlaq");
+        if (aqrl) { aq = true; rl = true; }
+        // Clean mnemonic (not strictly necessary here but kept for clarity)
+        return AssembleAmo(i, funct5, aq, rl, funct3, rs2Zero);
     }
 
     private static uint ParseGpr(string s)

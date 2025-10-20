@@ -22,6 +22,14 @@ public class UnifiedAssembler
         foreach (var kv in module.GetHandlers())
         {
             _handlers[kv.Key] = kv.Value;
+            // Also register common atomic suffix variants so mnemonics like 'lr.d.aq' or 'amoswap.d.aqrl' are supported
+            try
+            {
+                _handlers[$"{kv.Key}.aq"] = kv.Value;
+                _handlers[$"{kv.Key}.rl"] = kv.Value;
+                _handlers[$"{kv.Key}.aqrl"] = kv.Value;
+            }
+            catch { /* ignore duplicates */ }
         }
     }
 
@@ -33,7 +41,16 @@ public class UnifiedAssembler
         foreach (var line in lines)
         {
             var insn = Instruction.Parse(line);
-            if (_handlers.TryGetValue(insn.Mnemonic, out var fn))
+            // Allow suffixes like .aq and .rl on atomic mnemonics by stripping them for lookup
+            string lookup = insn.Mnemonic.ToLower();
+            bool stripped = true;
+            while (stripped)
+            {
+                stripped = false;
+                if (lookup.EndsWith(".aq")) { lookup = lookup[..^3]; stripped = true; }
+                if (lookup.EndsWith(".rl")) { lookup = lookup[..^3]; stripped = true; }
+            }
+            if (_handlers.TryGetValue(lookup, out var fn))
             {
                 foreach (var word in fn(insn))
                     yield return word;

@@ -45,6 +45,27 @@ public class RvfAssembler : IRiscVAssemblerModule
             { "fcvt.s.w",  i => new[] { AssembleFpCvts(i, Fpu.FCVT_S_W, isFromUnsigned:false) } },
             { "fcvt.s.wu", i => new[] { AssembleFpCvts(i, Fpu.FCVT_S_W, isFromUnsigned:true) } },
             { "fclass.s", i => new[] { AssembleFpClass(i) } },
+            // Double-precision variants (RVD)
+            { "fld", i => new[] { AssembleLoadStoreDouble(i, isLoad:true, funct3:0b011) } },
+            { "fsd", i => new[] { AssembleLoadStoreDouble(i, isLoad:false, funct3:0b011) } },
+            { "fadd.d", i => new[] { AssembleFpRTypeDouble(i, Fpu.FADD_D) } },
+            { "fsub.d", i => new[] { AssembleFpRTypeDouble(i, Fpu.FSUB_D) } },
+            { "fmul.d", i => new[] { AssembleFpRTypeDouble(i, Fpu.FMUL_D) } },
+            { "fdiv.d", i => new[] { AssembleFpRTypeDouble(i, Fpu.FDIV_D) } },
+            { "fsqrt.d", i => new[] { AssembleFpRS1Double(i, Fpu.FSQRT_D) } },
+            { "fmadd.d", i => new[] { AssembleFpR4(i, Opcodes.MADD) } },
+            { "fmsub.d", i => new[] { AssembleFpR4(i, Opcodes.MSUB) } },
+            { "fnmsub.d", i => new[] { AssembleFpR4(i, Opcodes.NMSUB) } },
+            { "fnmadd.d", i => new[] { AssembleFpR4(i, Opcodes.NMADD) } },
+            { "fsgnj.d", i => new[] { AssembleFpRTypeGenericDouble(i, Fpu.FSGNJ_D, 0b000) } },
+            { "fsgnjn.d", i => new[] { AssembleFpRTypeGenericDouble(i, Fpu.FSGNJ_D, 0b001) } },
+            { "fsgnjx.d", i => new[] { AssembleFpRTypeGenericDouble(i, Fpu.FSGNJ_D, 0b010) } },
+            { "fmin.d", i => new[] { AssembleFpRTypeGenericDouble(i, Fpu.FMINMAX_D, 0b000) } },
+            { "fmax.d", i => new[] { AssembleFpRTypeGenericDouble(i, Fpu.FMINMAX_D, 0b001) } },
+            { "fcvt.w.d",  i => new[] { AssembleFpCvti(i, Fpu.FCVT_W_D, isUnsigned:false) } },
+            { "fcvt.wu.d", i => new[] { AssembleFpCvti(i, Fpu.FCVT_W_D, isUnsigned:true) } },
+            { "fcvt.d.w",  i => new[] { AssembleFpCvts(i, Fpu.FCVT_D_W, isFromUnsigned:false) } },
+            { "fclass.d", i => new[] { AssembleFpClassDouble(i) } },
         };
     }
 
@@ -201,5 +222,60 @@ public class RvfAssembler : IRiscVAssemblerModule
         uint rd = ParseGpr(i.Operands[0]);
         uint rs1 = ParseFpr(i.Operands[1]);
         return InstructionBuilder.BuildFpRType(Fpu.FCLASS_S, 0, rd, rs1, 0, 0);
+    }
+
+    // Double-precision helpers
+    private uint AssembleLoadStoreDouble(Instruction instruction, bool isLoad, uint funct3)
+    {
+        if (instruction.Operands.Length != 2) throw new ArgumentException("FLD/FSD syntax");
+        if (isLoad)
+        {
+            uint rd = ParseFpr(instruction.Operands[0]);
+            var (rs1, imm) = ParseMem(instruction.Operands[1]);
+            return InstructionBuilder.BuildIType(Opcodes.LOAD_FP, funct3, rd, rs1, imm);
+        }
+        else
+        {
+            uint rs2 = ParseFpr(instruction.Operands[0]);
+            var (rs1, imm) = ParseMem(instruction.Operands[1]);
+            return InstructionBuilder.BuildSType(Opcodes.STORE_FP, funct3, rs1, rs2, imm);
+        }
+    }
+
+    private uint AssembleFpRTypeDouble(Instruction i, uint funct7)
+    {
+        if (i.Operands.Length < 3) throw new ArgumentException("FP R-type requires fd, fs1, fs2[, rm]");
+        uint rd = ParseFpr(i.Operands[0]);
+        uint rs1 = ParseFpr(i.Operands[1]);
+        uint rs2 = ParseFpr(i.Operands[2]);
+        uint rm = i.Operands.Length >= 4 ? Fpu.RmFromString(i.Operands[3]) : 0u;
+        return InstructionBuilder.BuildFpRType(funct7, 0, rd, rs1, rs2, rm);
+    }
+
+    private uint AssembleFpRS1Double(Instruction i, uint funct7)
+    {
+        if (i.Operands.Length < 2) throw new ArgumentException("FSQRT requires fd, fs1[, rm]");
+        uint rd = ParseFpr(i.Operands[0]);
+        uint rs1 = ParseFpr(i.Operands[1]);
+        uint rm = i.Operands.Length >= 3 ? Fpu.RmFromString(i.Operands[2]) : 0u;
+        return InstructionBuilder.BuildFpRType(funct7, 0, rd, rs1, 0, rm);
+    }
+
+    private static uint AssembleFpRTypeGenericDouble(Instruction i, uint funct7, uint funct3Selector)
+    {
+        if (i.Operands.Length < 3) throw new ArgumentException("FP R-type requires rd, rs1, rs2[, rm]");
+        uint rd = ParseFpr(i.Operands[0]);
+        uint rs1 = ParseFpr(i.Operands[1]);
+        uint rs2 = ParseFpr(i.Operands[2]);
+        uint rm = i.Operands.Length >= 4 ? Fpu.RmFromString(i.Operands[3]) : 0u;
+        return InstructionBuilder.BuildFpRType(funct7, funct3Selector, rd, rs1, rs2, rm);
+    }
+
+    private static uint AssembleFpClassDouble(Instruction i)
+    {
+        if (i.Operands.Length != 2) throw new ArgumentException("fclass.d requires rd, fs1");
+        uint rd = ParseGpr(i.Operands[0]);
+        uint rs1 = ParseFpr(i.Operands[1]);
+        return InstructionBuilder.BuildFpRType(Fpu.FCLASS_D, 0, rd, rs1, 0, 0);
     }
 }

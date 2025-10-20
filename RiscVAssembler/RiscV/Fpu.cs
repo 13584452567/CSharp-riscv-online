@@ -17,6 +17,20 @@ public static class Fpu
     public const uint FMV_W_X  = 0b1111000; // funct3=000, rs2=00000
     public const uint FCLASS_S = 0b1110000; // fclass.s (funct7)
 
+    // OP_FP funct7 encodings for double-precision (D) - mirror S with distinct codes
+    public const uint FADD_D  = 0b0000001;
+    public const uint FSUB_D  = 0b0000101;
+    public const uint FMUL_D  = 0b0001001;
+    public const uint FDIV_D  = 0b0001101;
+    public const uint FSQRT_D = 0b0101101;
+    public const uint FSGNJ_D = 0b0010001;
+    public const uint FMINMAX_D = 0b0010101;
+    public const uint FCVT_W_D = 0b1100001;
+    public const uint FCVT_D_W = 0b1101001;
+    public const uint FMV_X_D  = 0b1110001;
+    public const uint FMV_D_X  = 0b1111001;
+    public const uint FCLASS_D = 0b1110001;
+
     // Fused multiply-add opcodes (R4-type)
     public const uint MADD_S  = 0b1000011;
     public const uint MSUB_S  = 0b1000111;
