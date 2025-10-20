@@ -69,6 +69,45 @@ public class Rv32iAssembler : IRiscVAssemblerModule
 
             // J-Type
             { "jal", AssembleJType },
+            // Pseudo-instruction: j imm -> jal x0, imm
+            { "j", i => {
+                    if (i.Operands.Length != 1) throw new ArgumentException("j requires imm");
+                    int imm = ParseImmediate(i.Operands[0]);
+                    return InstructionBuilder.BuildJType(Opcodes.JAL, 0, imm);
+                }
+            },
+            // Common pseudo-instructions
+            { "li", i => {
+                    // li rd, imm -> if imm fits in 12-bit signed -> addi rd, x0, imm
+                    // else -> lui rd, imm_hi << 12 ; addi rd, rd, imm_lo
+                    if (i.Operands.Length != 2) throw new ArgumentException("li requires rd, imm");
+                    uint rd = ParseRegister(i.Operands[0]);
+                    int imm = ParseImmediate(i.Operands[1]);
+                    if (imm >= -2048 && imm <= 2047)
+                    {
+                        return InstructionBuilder.BuildIType(Opcodes.OP_IMM, 0b000, rd, 0, imm); // addi rd, x0, imm
+                    }
+                    throw new NotSupportedException("li for large immediates (outside -2048..2047) is not supported by this assembler handler.");
+                }
+            },
+            { "mv", i => {
+                    if (i.Operands.Length != 2) throw new ArgumentException("mv requires rd, rs");
+                    uint rd = ParseRegister(i.Operands[0]);
+                    uint rs = ParseRegister(i.Operands[1]);
+                    return InstructionBuilder.BuildIType(Opcodes.OP_IMM, 0b000, rd, rs, 0); // addi rd, rs, 0
+                }
+            },
+            { "ret", i => {
+                    if (i.Operands.Length != 0) throw new ArgumentException("ret takes no operands");
+                    // ret -> jalr x0, ra, 0
+                    return InstructionBuilder.BuildIType(Opcodes.JALR, 0b000, 0, 1, 0);
+                }
+            },
+            { "nop", i => {
+                    // nop -> addi x0, x0, 0 (encoded as addi x0, x0, 0 where rd=0, result discarded)
+                    return InstructionBuilder.BuildIType(Opcodes.OP_IMM, 0b000, 0, 0, 0);
+                }
+            },
         };
     }
 
