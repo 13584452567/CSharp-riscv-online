@@ -18,6 +18,11 @@ public class Rv64iAssembler : IRiscVAssemblerModule
             { "srliw", i => new[] { AssembleShiftIW(i, 0b101, 0b0000000) } },
             { "sraiw", i => new[] { AssembleShiftIW(i, 0b101, 0b0100000) } },
 
+            // Override base shifts with 6-bit shamt support
+            { "slli", i => new[] { AssembleShiftI64(i, 0b001, 0b0000000) } },
+            { "srli", i => new[] { AssembleShiftI64(i, 0b101, 0b0000000) } },
+            { "srai", i => new[] { AssembleShiftI64(i, 0b101, 0b0100000) } },
+
             // 64-bit register ops
             { "addw",  i => new[] { AssembleRTypeW(i, 0b000, 0b0000000) } },
             { "subw",  i => new[] { AssembleRTypeW(i, 0b000, 0b0100000) } },
@@ -28,6 +33,7 @@ public class Rv64iAssembler : IRiscVAssemblerModule
             // 64-bit loads/stores
             { "ld", i => new[] { AssembleLoadStore(i, isLoad:true,  funct3:0b011) } },
             { "sd", i => new[] { AssembleLoadStore(i, isLoad:false, funct3:0b011) } },
+            { "lwu", i => new[] { AssembleLwu(i) } },
             // M-extension (RV64) - same function codes as RV32 M-extension (funct7 = 0b0000001, opcode = OP)
             { "mul",    i => {
                     if (i.Operands.Length != 3) throw new ArgumentException("mul requires rd, rs1, rs2");
@@ -120,6 +126,19 @@ public class Rv64iAssembler : IRiscVAssemblerModule
         return InstructionBuilder.BuildIType(Opcodes.OP_IMM_32, funct3, rd, rs1, (int)imm);
     }
 
+    private uint AssembleShiftI64(Instruction instruction, uint funct3, uint funct7)
+    {
+        if (instruction.Operands.Length != 3)
+            throw new ArgumentException("shiftI requires rd, rs1, shamt");
+        uint rd = ParseRegister(instruction.Operands[0]);
+        uint rs1 = ParseRegister(instruction.Operands[1]);
+        int shamt = ParseImmediate(instruction.Operands[2]);
+        if (shamt < 0 || shamt > 63)
+            throw new ArgumentOutOfRangeException(nameof(shamt), "Shift amount must be between 0 and 63 for RV64I");
+        uint imm = ((uint)shamt & 0x3Fu) | (funct7 << 5);
+        return InstructionBuilder.BuildIType(Opcodes.OP_IMM, funct3, rd, rs1, (int)imm);
+    }
+
     private uint AssembleRTypeW(Instruction instruction, uint funct3, uint funct7)
     {
         if (instruction.Operands.Length != 3)
@@ -146,6 +165,15 @@ public class Rv64iAssembler : IRiscVAssemblerModule
             var (rs1, imm) = ParseMemoryOperand(instruction.Operands[1]);
             return InstructionBuilder.BuildSType(Opcodes.STORE, funct3, rs1, rs2, imm);
         }
+    }
+
+    private uint AssembleLwu(Instruction instruction)
+    {
+        if (instruction.Operands.Length != 2)
+            throw new ArgumentException("lwu requires rd, offset(base)");
+        uint rd = ParseRegister(instruction.Operands[0]);
+        var (rs1, imm) = ParseMemoryOperand(instruction.Operands[1]);
+        return InstructionBuilder.BuildIType(Opcodes.LOAD, 0b110, rd, rs1, imm);
     }
 
     private (uint register, int offset) ParseMemoryOperand(string operand)

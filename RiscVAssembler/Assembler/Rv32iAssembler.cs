@@ -57,8 +57,13 @@ public class Rv32iAssembler : IRiscVAssemblerModule
             { "lbu", i => new[] { AssembleLoadType(i, 0b100) } },
             { "lhu", i => new[] { AssembleLoadType(i, 0b101) } },
 
+            // Fence instructions (Zifencei / base ordering)
+            { "fence", i => new[] { AssembleFence(i) } },
+            { "fence.i", i => new[] { InstructionBuilder.BuildIType(Opcodes.FENCE, 0b001, 0, 0, 0) } },
+            { "fence.tso", i => new[] { AssembleFenceTso(i) } },
+
             // I-Type (JALR)
-            { "jalr", i => new[] { AssembleIType(i, Opcodes.JALR, 0b000) } },
+            { "jalr", AssembleJalr },
 
             // S-Type
             { "sb", i => new[] { AssembleSType(i, 0b000) } },
@@ -78,7 +83,7 @@ public class Rv32iAssembler : IRiscVAssemblerModule
             { "auipc", i => new[] { AssembleUType(i, Opcodes.AUIPC) } },
 
             // J-Type
-            { "jal", i => new[] { AssembleJType(i) } },
+            { "jal", AssembleJal },
             // Pseudo-instruction: j imm -> jal x0, imm
             { "j", i => {
                     if (i.Operands.Length != 1) throw new ArgumentException("j requires imm");
@@ -114,11 +119,14 @@ public class Rv32iAssembler : IRiscVAssemblerModule
                     return new[] { InstructionBuilder.BuildIType(Opcodes.OP_IMM, 0b000, rd, rs, 0) }; // addi rd, rs, 0
                 }
             },
-            // call imm -> jal ra, imm
+            // call imm -> auipc ra, hi ; jalr ra, ra, lo
             { "call", i => {
                     if (i.Operands.Length != 1) throw new ArgumentException("call requires imm");
                     int imm = ParseImmediate(i.Operands[0]);
-                    return new[] { InstructionBuilder.BuildJType(Opcodes.JAL, 1, imm) };
+                    var (hi, lo) = SplitImmediateForAuipcJalr(imm);
+                    uint auipc = InstructionBuilder.BuildUType(Opcodes.AUIPC, 1, hi);
+                    uint jalr = InstructionBuilder.BuildIType(Opcodes.JALR, 0b000, 1, 1, lo);
+                    return new[] { auipc, jalr };
                 }
             },
             // la rd, imm -> like li but use LUI+ADDI for large immediates
@@ -158,6 +166,30 @@ public class Rv32iAssembler : IRiscVAssemblerModule
                     uint rd = ParseRegister(i.Operands[0]);
                     uint rs = ParseRegister(i.Operands[1]);
                     return new[] { InstructionBuilder.BuildIType(Opcodes.OP_IMM, 0b011, rd, rs, 1) };
+                }
+            },
+            // snez rd, rs -> sltu rd, x0, rs
+            { "snez", i => {
+                    if (i.Operands.Length != 2) throw new ArgumentException("snez requires rd, rs");
+                    uint rd = ParseRegister(i.Operands[0]);
+                    uint rs = ParseRegister(i.Operands[1]);
+                    return new[] { InstructionBuilder.BuildRType(Opcodes.OP, 0b011, 0b0000000, rd, 0, rs) };
+                }
+            },
+            // sltz rd, rs -> slt rd, rs, x0
+            { "sltz", i => {
+                    if (i.Operands.Length != 2) throw new ArgumentException("sltz requires rd, rs");
+                    uint rd = ParseRegister(i.Operands[0]);
+                    uint rs = ParseRegister(i.Operands[1]);
+                    return new[] { InstructionBuilder.BuildRType(Opcodes.OP, 0b010, 0b0000000, rd, rs, 0) };
+                }
+            },
+            // sgtz rd, rs -> slt rd, x0, rs
+            { "sgtz", i => {
+                    if (i.Operands.Length != 2) throw new ArgumentException("sgtz requires rd, rs");
+                    uint rd = ParseRegister(i.Operands[0]);
+                    uint rs = ParseRegister(i.Operands[1]);
+                    return new[] { InstructionBuilder.BuildRType(Opcodes.OP, 0b010, 0b0000000, rd, 0, rs) };
                 }
             },
             // push rs -> addi sp, sp, -4 ; sw rs, 0(sp)
@@ -218,6 +250,49 @@ public class Rv32iAssembler : IRiscVAssemblerModule
                     return new[] { InstructionBuilder.BuildBType(Opcodes.BRANCH, 0b111, rs2, rs1, imm) };
                 }
             },
+            // Branch-zero aliases
+            { "beqz", i => {
+                    if (i.Operands.Length != 2) throw new ArgumentException("beqz requires rs, imm");
+                    uint rs = ParseRegister(i.Operands[0]);
+                    int imm = ParseImmediate(i.Operands[1]);
+                    return new[] { InstructionBuilder.BuildBType(Opcodes.BRANCH, 0b000, rs, 0, imm) };
+                }
+            },
+            { "bnez", i => {
+                    if (i.Operands.Length != 2) throw new ArgumentException("bnez requires rs, imm");
+                    uint rs = ParseRegister(i.Operands[0]);
+                    int imm = ParseImmediate(i.Operands[1]);
+                    return new[] { InstructionBuilder.BuildBType(Opcodes.BRANCH, 0b001, rs, 0, imm) };
+                }
+            },
+            { "blez", i => {
+                    if (i.Operands.Length != 2) throw new ArgumentException("blez requires rs, imm");
+                    uint rs = ParseRegister(i.Operands[0]);
+                    int imm = ParseImmediate(i.Operands[1]);
+                    return new[] { InstructionBuilder.BuildBType(Opcodes.BRANCH, 0b101, 0, rs, imm) };
+                }
+            },
+            { "bgez", i => {
+                    if (i.Operands.Length != 2) throw new ArgumentException("bgez requires rs, imm");
+                    uint rs = ParseRegister(i.Operands[0]);
+                    int imm = ParseImmediate(i.Operands[1]);
+                    return new[] { InstructionBuilder.BuildBType(Opcodes.BRANCH, 0b101, rs, 0, imm) };
+                }
+            },
+            { "bltz", i => {
+                    if (i.Operands.Length != 2) throw new ArgumentException("bltz requires rs, imm");
+                    uint rs = ParseRegister(i.Operands[0]);
+                    int imm = ParseImmediate(i.Operands[1]);
+                    return new[] { InstructionBuilder.BuildBType(Opcodes.BRANCH, 0b100, rs, 0, imm) };
+                }
+            },
+            { "bgtz", i => {
+                    if (i.Operands.Length != 2) throw new ArgumentException("bgtz requires rs, imm");
+                    uint rs = ParseRegister(i.Operands[0]);
+                    int imm = ParseImmediate(i.Operands[1]);
+                    return new[] { InstructionBuilder.BuildBType(Opcodes.BRANCH, 0b100, 0, rs, imm) };
+                }
+            },
             // pushm r1,r2,... -> addi sp, sp, -4*n ; sw r1, 0(sp) ; sw r2, 4(sp) ; ...
             { "pushm", i => {
                     if (i.Operands.Length < 1) throw new ArgumentException("pushm requires at least one register");
@@ -257,9 +332,24 @@ public class Rv32iAssembler : IRiscVAssemblerModule
                     return new[] { InstructionBuilder.BuildIType(Opcodes.JALR, 0b000, 0, 1, 0) };
                 }
             },
+            { "jr", i => {
+                    if (i.Operands.Length != 1) throw new ArgumentException("jr requires rs");
+                    uint rs = ParseRegister(i.Operands[0]);
+                    return new[] { InstructionBuilder.BuildIType(Opcodes.JALR, 0b000, 0, rs, 0) };
+                }
+            },
             { "nop", i => {
                     // nop -> addi x0, x0, 0 (encoded as addi x0, x0, 0 where rd=0, result discarded)
                     return new[] { InstructionBuilder.BuildIType(Opcodes.OP_IMM, 0b000, 0, 0, 0) };
+                }
+            },
+            { "tail", i => {
+                    if (i.Operands.Length != 1) throw new ArgumentException("tail requires imm");
+                    int imm = ParseImmediate(i.Operands[0]);
+                    var (hi, lo) = SplitImmediateForAuipcJalr(imm);
+                    uint auipc = InstructionBuilder.BuildUType(Opcodes.AUIPC, 6, hi);
+                    uint jalr = InstructionBuilder.BuildIType(Opcodes.JALR, 0b000, 0, 6, lo);
+                    return new[] { auipc, jalr };
                 }
             },
         };
@@ -377,6 +467,59 @@ public class Rv32iAssembler : IRiscVAssemblerModule
         return InstructionBuilder.BuildUType(opcode, rd, imm);
     }
 
+    private IEnumerable<uint> AssembleJal(Instruction instruction)
+    {
+        uint rd;
+        int imm;
+
+        if (instruction.Operands.Length == 1)
+        {
+            rd = 1; // ra
+            imm = ParseImmediate(instruction.Operands[0]);
+        }
+        else if (instruction.Operands.Length == 2)
+        {
+            rd = ParseRegister(instruction.Operands[0]);
+            imm = ParseImmediate(instruction.Operands[1]);
+        }
+        else
+        {
+            throw new ArgumentException("jal expects 'jal imm' or 'jal rd, imm'");
+        }
+
+        yield return InstructionBuilder.BuildJType(Opcodes.JAL, rd, imm);
+    }
+
+    private IEnumerable<uint> AssembleJalr(Instruction instruction)
+    {
+        uint rd;
+        uint rs1;
+        int imm;
+
+        switch (instruction.Operands.Length)
+        {
+            case 1:
+                rd = 1; // default ra
+                rs1 = ParseRegister(instruction.Operands[0]);
+                imm = 0;
+                break;
+            case 2:
+                rd = ParseRegister(instruction.Operands[0]);
+                rs1 = ParseRegister(instruction.Operands[1]);
+                imm = 0;
+                break;
+            case 3:
+                rd = ParseRegister(instruction.Operands[0]);
+                rs1 = ParseRegister(instruction.Operands[1]);
+                imm = ParseImmediate(instruction.Operands[2]);
+                break;
+            default:
+                throw new ArgumentException("jalr expects 'jalr rs1', 'jalr rd, rs1', or 'jalr rd, rs1, imm'");
+        }
+
+        yield return InstructionBuilder.BuildIType(Opcodes.JALR, 0b000, rd, rs1, imm);
+    }
+
     private uint AssembleJType(Instruction instruction)
     {
         if (instruction.Operands.Length != 2)
@@ -445,9 +588,17 @@ public class Rv32iAssembler : IRiscVAssemblerModule
         };
     }
 
-    private int ParseImmediate(string imm)
+    private static int ParseImmediate(string imm)
     {
         imm = imm.ToLower();
+        if (imm.StartsWith("-0x"))
+        {
+            return -Convert.ToInt32(imm[3..], 16);
+        }
+        if (imm.StartsWith("+0x"))
+        {
+            return Convert.ToInt32(imm[3..], 16);
+        }
         if (imm.StartsWith("0x"))
         {
             return Convert.ToInt32(imm, 16);
@@ -462,4 +613,98 @@ public class Rv32iAssembler : IRiscVAssemblerModule
     #endregion
 
     public IReadOnlyDictionary<string, Func<Instruction, IEnumerable<uint>>> GetHandlers() => _instructionHandlers;
+
+    private static uint AssembleFence(Instruction instruction)
+    {
+        int fm = 0;
+        int pred = 0b1111; // default iorw
+        int succ = 0b1111;
+
+        var operands = instruction.Operands;
+        int index = 0;
+        if (operands.Length > 0 && TryParseFenceFm(operands[0], out var parsedFm))
+        {
+            fm = parsedFm;
+            index = 1;
+        }
+
+        int remaining = operands.Length - index;
+        switch (remaining)
+        {
+            case 0:
+                break;
+            case 1:
+                pred = ParseFenceMask(operands[index]);
+                break;
+            case 2:
+                pred = ParseFenceMask(operands[index]);
+                succ = ParseFenceMask(operands[index + 1]);
+                break;
+            default:
+                throw new ArgumentException("fence accepts at most three operands (fm?, pred?, succ?)");
+        }
+
+        int imm = (fm & 0xF) | ((succ & 0xF) << 4) | ((pred & 0xF) << 8);
+        return InstructionBuilder.BuildIType(Opcodes.FENCE, 0b000, 0, 0, imm);
+    }
+
+    private static uint AssembleFenceTso(Instruction instruction)
+    {
+        if (instruction.Operands.Length > 0)
+            throw new ArgumentException("fence.tso takes no operands");
+        // Alias specified as fence rw, rw
+        int pred = ParseFenceMask("rw");
+        int succ = ParseFenceMask("rw");
+        int imm = ((succ & 0xF) << 4) | ((pred & 0xF) << 8);
+        return InstructionBuilder.BuildIType(Opcodes.FENCE, 0b000, 0, 0, imm);
+    }
+
+    private static bool TryParseFenceFm(string operand, out int fm)
+    {
+        operand = operand.Trim();
+        try
+        {
+            int value = ParseImmediate(operand);
+            if (value is < 0 or > 15)
+                throw new ArgumentOutOfRangeException(nameof(operand), "fm must be a 4-bit immediate");
+            fm = value;
+            return true;
+        }
+        catch
+        {
+            fm = 0;
+            return false;
+        }
+    }
+
+    private static int ParseFenceMask(string operand)
+    {
+        operand = operand.Trim().ToLowerInvariant();
+        if (operand is "" or "iorw") return 0b1111;
+        if (operand == "0") return 0;
+
+        int mask = 0;
+        foreach (char c in operand)
+        {
+            mask |= c switch
+            {
+                'w' => 0b0001,
+                'r' => 0b0010,
+                'o' => 0b0100,
+                'i' => 0b1000,
+                _ => throw new ArgumentException($"Invalid fence operand '{operand}'")
+            };
+        }
+        return mask & 0xF;
+    }
+
+    private static (int hi, int lo) SplitImmediateForAuipcJalr(int offset)
+    {
+        long value = offset;
+        long hi = ((value + 0x800L) >> 12) << 12;
+        long lo = value - hi;
+        if (lo < -2048 || lo > 2047)
+            throw new ArgumentOutOfRangeException(nameof(offset), "Offset out of range for AUIPC/JALR pairing");
+        return ((int)hi, (int)lo);
+    }
 }

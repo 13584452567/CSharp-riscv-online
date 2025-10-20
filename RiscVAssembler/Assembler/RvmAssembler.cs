@@ -44,7 +44,11 @@ namespace RiscVAssembler.Assembler
                 _ => throw new NotSupportedException(),
             };
 
-            yield return instruction.AssembleRType(Opcodes.OP, funct3, Funct7.MULDIV);
+            var opcode = instruction.Mnemonic.EndsWith("w", StringComparison.OrdinalIgnoreCase)
+                ? Opcodes.OP_32
+                : Opcodes.OP;
+
+            yield return instruction.AssembleRType(opcode, funct3, Funct7.MULDIV);
         }
     }
 }

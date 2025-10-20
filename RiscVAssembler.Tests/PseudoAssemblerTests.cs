@@ -26,6 +26,8 @@ namespace RiscVAssembler.Tests
         [InlineData("jr x1", "jalr x0, x1, 0")]
         [InlineData("jalr x1", "jalr x1, x1, 0")]
         [InlineData("ret", "jalr x0, x1, 0")]
+        [InlineData("call 0x123456", "auipc x1, 0x123000; jalr x1, x1, 0x456")]
+        [InlineData("tail -0x1000", "auipc x6, -0x1000; jalr x0, x6, 0")]
         public void PseudoInstructionIsAssembledCorrectly(string pseudo, string real)
         {
             var pseudoAssembler = new UnifiedAssembler();
