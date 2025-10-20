@@ -15,6 +15,7 @@ public static class Fpu
     public const uint FCVT_S_W = 0b1101000; // rs2 = 0b00000 (W) or 0b00001 (WU)
     public const uint FMV_X_W  = 0b1110000; // funct3=000, rs2=00000
     public const uint FMV_W_X  = 0b1111000; // funct3=000, rs2=00000
+    public const uint FCLASS_S = 0b1110000; // fclass.s (funct7)
 
     // Fused multiply-add opcodes (R4-type)
     public const uint MADD_S  = 0b1000011;

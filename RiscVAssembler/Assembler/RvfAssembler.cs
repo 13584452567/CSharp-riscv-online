@@ -32,6 +32,19 @@ public class RvfAssembler : IRiscVAssemblerModule
             // moves and converts (simplified)
             { "fmv.x.w", i => new[] { AssembleFpMove(i, toInt:true) } },
             { "fmv.w.x", i => new[] { AssembleFpMove(i, toInt:false) } },
+            // sign-insert/extract
+            { "fsgnj.s", i => new[] { AssembleFpRTypeGeneric(i, Fpu.FSGNJ_S, 0b000) } },
+            { "fsgnjn.s", i => new[] { AssembleFpRTypeGeneric(i, Fpu.FSGNJ_S, 0b001) } },
+            { "fsgnjx.s", i => new[] { AssembleFpRTypeGeneric(i, Fpu.FSGNJ_S, 0b010) } },
+            // min/max
+            { "fmin.s", i => new[] { AssembleFpRTypeGeneric(i, Fpu.FMINMAX_S, 0b000) } },
+            { "fmax.s", i => new[] { AssembleFpRTypeGeneric(i, Fpu.FMINMAX_S, 0b001) } },
+            // conversions
+            { "fcvt.w.s",  i => new[] { AssembleFpCvti(i, Fpu.FCVT_W_S, isUnsigned:false) } },
+            { "fcvt.wu.s", i => new[] { AssembleFpCvti(i, Fpu.FCVT_W_S, isUnsigned:true) } },
+            { "fcvt.s.w",  i => new[] { AssembleFpCvts(i, Fpu.FCVT_S_W, isFromUnsigned:false) } },
+            { "fcvt.s.wu", i => new[] { AssembleFpCvts(i, Fpu.FCVT_S_W, isFromUnsigned:true) } },
+            { "fclass.s", i => new[] { AssembleFpClass(i) } },
         };
     }
 
@@ -144,5 +157,49 @@ public class RvfAssembler : IRiscVAssemblerModule
             "s8"=>24,"s9"=>25,"s10"=>26,"s11"=>27,
             "t3"=>28,"t4"=>29,"t5"=>30,"t6"=>31,
             _=>throw new ArgumentException($"Unknown reg {s}")};
+    }
+
+    // Generic FP R-type assembler for operations which use OP_FP with funct7 and a funct3 selector in rm
+    private static uint AssembleFpRTypeGeneric(Instruction i, uint funct7, uint funct3Selector)
+    {
+        if (i.Operands.Length < 3) throw new ArgumentException("FP R-type requires rd, rs1, rs2[, rm]");
+        uint rd = ParseFpr(i.Operands[0]);
+        uint rs1 = ParseFpr(i.Operands[1]);
+        uint rs2 = ParseFpr(i.Operands[2]);
+        uint rm = i.Operands.Length >= 4 ? Fpu.RmFromString(i.Operands[3]) : 0u;
+        // Place selector in rm field (bits 14..12) and use funct7 for operation
+        return InstructionBuilder.BuildFpRType(funct7, funct3Selector, rd, rs1, rs2, rm);
+    }
+
+    // FP convert to int (fcvt.w.s / fcvt.wu.s)
+    private static uint AssembleFpCvti(Instruction i, uint funct7, bool isUnsigned)
+    {
+        if (i.Operands.Length < 2) throw new ArgumentException("fcvt.w.s requires rd, fs1[, rm]");
+        uint rd = ParseGpr(i.Operands[0]);
+        uint rs1 = ParseFpr(i.Operands[1]);
+        uint rm = i.Operands.Length >= 3 ? Fpu.RmFromString(i.Operands[2]) : 0u;
+        // For FCVT.W.S and FCVT.WU.S, rs2 encodes width/unsigned selection in some decoders; here we assume funct7 handles it via Fpu.FCVT_W_S and we set rs2 accordingly
+        uint rs2 = isUnsigned ? 0b00001u : 0b00000u;
+        return Opcodes.OP_FP | (rd << 7) | (rm << 12) | (rs1 << 15) | (rs2 << 20) | (funct7 << 25);
+    }
+
+    // FP convert from int (fcvt.s.w / fcvt.s.wu)
+    private static uint AssembleFpCvts(Instruction i, uint funct7, bool isFromUnsigned)
+    {
+        if (i.Operands.Length < 2) throw new ArgumentException("fcvt.s.w requires fd, rs1[, rm]");
+        uint rd = ParseFpr(i.Operands[0]);
+        uint rs1 = ParseGpr(i.Operands[1]);
+        uint rm = i.Operands.Length >= 3 ? Fpu.RmFromString(i.Operands[2]) : 0u;
+        uint rs2 = isFromUnsigned ? 0b00001u : 0b00000u;
+        return Opcodes.OP_FP | (rd << 7) | (rm << 12) | (rs1 << 15) | (rs2 << 20) | (funct7 << 25);
+    }
+
+    // fclass.s: uses OP_FP with funct7 = FCLASS_S and rd, rs1, rm=0
+    private static uint AssembleFpClass(Instruction i)
+    {
+        if (i.Operands.Length != 2) throw new ArgumentException("fclass.s requires rd, fs1");
+        uint rd = ParseGpr(i.Operands[0]);
+        uint rs1 = ParseFpr(i.Operands[1]);
+        return InstructionBuilder.BuildFpRType(Fpu.FCLASS_S, 0, rd, rs1, 0, 0);
     }
 }

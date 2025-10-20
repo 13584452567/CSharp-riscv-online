@@ -27,6 +27,15 @@ public class Rv32iAssembler : IRiscVAssemblerModule
             { "sra", i => new[] { AssembleRType(i, 0b101, 0b0100000) } },
             { "or", i => new[] { AssembleRType(i, 0b110, 0b0000000) } },
             { "and", i => new[] { AssembleRType(i, 0b111, 0b0000000) } },
+            // M-extension (multiply/divide/remainder) funct7 = 0b0000001
+            { "mul",     i => new[] { AssembleRType(i, 0b000, 0b0000001) } },
+            { "mulh",    i => new[] { AssembleRType(i, 0b001, 0b0000001) } },
+            { "mulhsu",  i => new[] { AssembleRType(i, 0b010, 0b0000001) } },
+            { "mulhu",   i => new[] { AssembleRType(i, 0b011, 0b0000001) } },
+            { "div",     i => new[] { AssembleRType(i, 0b100, 0b0000001) } },
+            { "divu",    i => new[] { AssembleRType(i, 0b101, 0b0000001) } },
+            { "rem",     i => new[] { AssembleRType(i, 0b110, 0b0000001) } },
+            { "remu",    i => new[] { AssembleRType(i, 0b111, 0b0000001) } },
 
             // I-Type (OP_IMM)
             { "addi", i => new[] { AssembleIType(i, Opcodes.OP_IMM, 0b000) } },

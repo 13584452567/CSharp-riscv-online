@@ -28,6 +28,71 @@ public class Rv64iAssembler : IRiscVAssemblerModule
             // 64-bit loads/stores
             { "ld", i => new[] { AssembleLoadStore(i, isLoad:true,  funct3:0b011) } },
             { "sd", i => new[] { AssembleLoadStore(i, isLoad:false, funct3:0b011) } },
+            // M-extension (RV64) - same function codes as RV32 M-extension (funct7 = 0b0000001, opcode = OP)
+            { "mul",    i => {
+                    if (i.Operands.Length != 3) throw new ArgumentException("mul requires rd, rs1, rs2");
+                    uint rd = ParseRegister(i.Operands[0]);
+                    uint rs1 = ParseRegister(i.Operands[1]);
+                    uint rs2 = ParseRegister(i.Operands[2]);
+                    return new[] { InstructionBuilder.BuildRType(Opcodes.OP, 0b000, 0b0000001, rd, rs1, rs2) };
+                }
+            },
+            { "mulh",   i => {
+                    if (i.Operands.Length != 3) throw new ArgumentException("mulh requires rd, rs1, rs2");
+                    uint rd = ParseRegister(i.Operands[0]);
+                    uint rs1 = ParseRegister(i.Operands[1]);
+                    uint rs2 = ParseRegister(i.Operands[2]);
+                    return new[] { InstructionBuilder.BuildRType(Opcodes.OP, 0b001, 0b0000001, rd, rs1, rs2) };
+                }
+            },
+            { "mulhsu", i => {
+                    if (i.Operands.Length != 3) throw new ArgumentException("mulhsu requires rd, rs1, rs2");
+                    uint rd = ParseRegister(i.Operands[0]);
+                    uint rs1 = ParseRegister(i.Operands[1]);
+                    uint rs2 = ParseRegister(i.Operands[2]);
+                    return new[] { InstructionBuilder.BuildRType(Opcodes.OP, 0b010, 0b0000001, rd, rs1, rs2) };
+                }
+            },
+            { "mulhu",  i => {
+                    if (i.Operands.Length != 3) throw new ArgumentException("mulhu requires rd, rs1, rs2");
+                    uint rd = ParseRegister(i.Operands[0]);
+                    uint rs1 = ParseRegister(i.Operands[1]);
+                    uint rs2 = ParseRegister(i.Operands[2]);
+                    return new[] { InstructionBuilder.BuildRType(Opcodes.OP, 0b011, 0b0000001, rd, rs1, rs2) };
+                }
+            },
+            { "div",    i => {
+                    if (i.Operands.Length != 3) throw new ArgumentException("div requires rd, rs1, rs2");
+                    uint rd = ParseRegister(i.Operands[0]);
+                    uint rs1 = ParseRegister(i.Operands[1]);
+                    uint rs2 = ParseRegister(i.Operands[2]);
+                    return new[] { InstructionBuilder.BuildRType(Opcodes.OP, 0b100, 0b0000001, rd, rs1, rs2) };
+                }
+            },
+            { "divu",   i => {
+                    if (i.Operands.Length != 3) throw new ArgumentException("divu requires rd, rs1, rs2");
+                    uint rd = ParseRegister(i.Operands[0]);
+                    uint rs1 = ParseRegister(i.Operands[1]);
+                    uint rs2 = ParseRegister(i.Operands[2]);
+                    return new[] { InstructionBuilder.BuildRType(Opcodes.OP, 0b101, 0b0000001, rd, rs1, rs2) };
+                }
+            },
+            { "rem",    i => {
+                    if (i.Operands.Length != 3) throw new ArgumentException("rem requires rd, rs1, rs2");
+                    uint rd = ParseRegister(i.Operands[0]);
+                    uint rs1 = ParseRegister(i.Operands[1]);
+                    uint rs2 = ParseRegister(i.Operands[2]);
+                    return new[] { InstructionBuilder.BuildRType(Opcodes.OP, 0b110, 0b0000001, rd, rs1, rs2) };
+                }
+            },
+            { "remu",   i => {
+                    if (i.Operands.Length != 3) throw new ArgumentException("remu requires rd, rs1, rs2");
+                    uint rd = ParseRegister(i.Operands[0]);
+                    uint rs1 = ParseRegister(i.Operands[1]);
+                    uint rs2 = ParseRegister(i.Operands[2]);
+                    return new[] { InstructionBuilder.BuildRType(Opcodes.OP, 0b111, 0b0000001, rd, rs1, rs2) };
+                }
+            },
         };
     }
 
