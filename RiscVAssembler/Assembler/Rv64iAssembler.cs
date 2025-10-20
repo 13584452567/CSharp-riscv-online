@@ -6,32 +6,32 @@ namespace RiscVAssembler.Assembler;
 
 public class Rv64iAssembler : IRiscVAssemblerModule
 {
-    private readonly Dictionary<string, Func<Instruction, uint>> _handlers;
+    private readonly Dictionary<string, Func<Instruction, IEnumerable<uint>>> _handlers;
 
     public Rv64iAssembler()
     {
         _handlers = new(StringComparer.OrdinalIgnoreCase)
         {
             // 64-bit immediate ops
-            { "addiw", i => AssembleITypeW(i, 0b000) },
-            { "slliw", i => AssembleShiftIW(i, 0b001, 0b0000000) },
-            { "srliw", i => AssembleShiftIW(i, 0b101, 0b0000000) },
-            { "sraiw", i => AssembleShiftIW(i, 0b101, 0b0100000) },
+            { "addiw", i => new[] { AssembleITypeW(i, 0b000) } },
+            { "slliw", i => new[] { AssembleShiftIW(i, 0b001, 0b0000000) } },
+            { "srliw", i => new[] { AssembleShiftIW(i, 0b101, 0b0000000) } },
+            { "sraiw", i => new[] { AssembleShiftIW(i, 0b101, 0b0100000) } },
 
             // 64-bit register ops
-            { "addw",  i => AssembleRTypeW(i, 0b000, 0b0000000) },
-            { "subw",  i => AssembleRTypeW(i, 0b000, 0b0100000) },
-            { "sllw",  i => AssembleRTypeW(i, 0b001, 0b0000000) },
-            { "srlw",  i => AssembleRTypeW(i, 0b101, 0b0000000) },
-            { "sraw",  i => AssembleRTypeW(i, 0b101, 0b0100000) },
+            { "addw",  i => new[] { AssembleRTypeW(i, 0b000, 0b0000000) } },
+            { "subw",  i => new[] { AssembleRTypeW(i, 0b000, 0b0100000) } },
+            { "sllw",  i => new[] { AssembleRTypeW(i, 0b001, 0b0000000) } },
+            { "srlw",  i => new[] { AssembleRTypeW(i, 0b101, 0b0000000) } },
+            { "sraw",  i => new[] { AssembleRTypeW(i, 0b101, 0b0100000) } },
 
             // 64-bit loads/stores
-            { "ld", i => AssembleLoadStore(i, isLoad:true,  funct3:0b011) },
-            { "sd", i => AssembleLoadStore(i, isLoad:false, funct3:0b011) },
+            { "ld", i => new[] { AssembleLoadStore(i, isLoad:true,  funct3:0b011) } },
+            { "sd", i => new[] { AssembleLoadStore(i, isLoad:false, funct3:0b011) } },
         };
     }
 
-    public IReadOnlyDictionary<string, Func<Instruction, uint>> GetHandlers() => _handlers;
+    public IReadOnlyDictionary<string, Func<Instruction, IEnumerable<uint>>> GetHandlers() => _handlers;
 
     private uint AssembleITypeW(Instruction instruction, uint funct3)
     {

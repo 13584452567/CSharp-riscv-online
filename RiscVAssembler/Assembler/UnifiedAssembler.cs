@@ -5,7 +5,7 @@ namespace RiscVAssembler.Assembler;
 
 public class UnifiedAssembler
 {
-    private readonly Dictionary<string, Func<Instruction, uint>> _handlers = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Func<Instruction, IEnumerable<uint>>> _handlers = new(StringComparer.OrdinalIgnoreCase);
 
     public UnifiedAssembler()
     {
@@ -34,7 +34,10 @@ public class UnifiedAssembler
         {
             var insn = Instruction.Parse(line);
             if (_handlers.TryGetValue(insn.Mnemonic, out var fn))
-                yield return fn(insn);
+            {
+                foreach (var word in fn(insn))
+                    yield return word;
+            }
             else
                 throw new NotSupportedException($"Instruction '{insn.Mnemonic}' not supported.");
         }

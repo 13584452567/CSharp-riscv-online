@@ -5,33 +5,33 @@ namespace RiscVAssembler.Assembler;
 
 public class RvzicsrAssembler : IRiscVAssemblerModule
 {
-    private readonly Dictionary<string, Func<Instruction, uint>> _handlers;
+    private readonly Dictionary<string, Func<Instruction, IEnumerable<uint>>> _handlers;
 
     public RvzicsrAssembler()
     {
         _handlers = new(StringComparer.OrdinalIgnoreCase)
         {
             // full forms
-            { "csrrw",  i => AssembleCsr(i, funct3:0b001) },
-            { "csrrs",  i => AssembleCsr(i, funct3:0b010) },
-            { "csrrc",  i => AssembleCsr(i, funct3:0b011) },
-            { "csrrwi", i => AssembleCsrImm(i, funct3:0b101) },
-            { "csrrsi", i => AssembleCsrImm(i, funct3:0b110) },
-            { "csrrci", i => AssembleCsrImm(i, funct3:0b111) },
+            { "csrrw",  i => new[] { AssembleCsr(i, funct3:0b001) } },
+            { "csrrs",  i => new[] { AssembleCsr(i, funct3:0b010) } },
+            { "csrrc",  i => new[] { AssembleCsr(i, funct3:0b011) } },
+            { "csrrwi", i => new[] { AssembleCsrImm(i, funct3:0b101) } },
+            { "csrrsi", i => new[] { AssembleCsrImm(i, funct3:0b110) } },
+            { "csrrci", i => new[] { AssembleCsrImm(i, funct3:0b111) } },
 
             // Common assembler shorthand: csrw csr, rs  -> csrrw x0, csr, rs
             //                           csrs csr, rs  -> csrrs x0, csr, rs
             //                           csrc csr, rs  -> csrrc x0, csr, rs
-            { "csrw",  i => AssembleCsr(ExpandTwoOperandCsr(i, "x0"), funct3:0b001) },
-            { "csrs",  i => AssembleCsr(ExpandTwoOperandCsr(i, "x0"), funct3:0b010) },
-            { "csrc",  i => AssembleCsr(ExpandTwoOperandCsr(i, "x0"), funct3:0b011) },
+            { "csrw",  i => new[] { AssembleCsr(ExpandTwoOperandCsr(i, "x0"), funct3:0b001) } },
+            { "csrs",  i => new[] { AssembleCsr(ExpandTwoOperandCsr(i, "x0"), funct3:0b010) } },
+            { "csrc",  i => new[] { AssembleCsr(ExpandTwoOperandCsr(i, "x0"), funct3:0b011) } },
 
-            { "ecall",  i => InstructionBuilder.BuildIType(Opcodes.SYSTEM, 0b000, 0, 0, 0) },
-            { "ebreak", i => InstructionBuilder.BuildIType(Opcodes.SYSTEM, 0b000, 0, 0, 1) },
+            { "ecall",  i => new[] { InstructionBuilder.BuildIType(Opcodes.SYSTEM, 0b000, 0, 0, 0) } },
+            { "ebreak", i => new[] { InstructionBuilder.BuildIType(Opcodes.SYSTEM, 0b000, 0, 0, 1) } },
         };
     }
 
-    public IReadOnlyDictionary<string, Func<Instruction, uint>> GetHandlers() => _handlers;
+    public IReadOnlyDictionary<string, Func<Instruction, IEnumerable<uint>>> GetHandlers() => _handlers;
 
     private uint AssembleCsr(Instruction i, uint funct3)
     {

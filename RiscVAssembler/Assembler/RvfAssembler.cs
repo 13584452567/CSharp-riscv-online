@@ -6,36 +6,36 @@ namespace RiscVAssembler.Assembler;
 
 public class RvfAssembler : IRiscVAssemblerModule
 {
-    private readonly Dictionary<string, Func<Instruction, uint>> _handlers;
+    private readonly Dictionary<string, Func<Instruction, IEnumerable<uint>>> _handlers;
 
     public RvfAssembler()
     {
         _handlers = new(StringComparer.OrdinalIgnoreCase)
         {
             // loads/stores
-            { "flw", i => AssembleLoadStore(i, isLoad:true,  funct3:0b010) },
-            { "fsw", i => AssembleLoadStore(i, isLoad:false, funct3:0b010) },
+            { "flw", i => new[] { AssembleLoadStore(i, isLoad:true,  funct3:0b010) } },
+            { "fsw", i => new[] { AssembleLoadStore(i, isLoad:false, funct3:0b010) } },
 
             // basic fp ops
-            { "fadd.s", i => AssembleFpRType(i, Fpu.FADD_S) },
-            { "fsub.s", i => AssembleFpRType(i, Fpu.FSUB_S) },
-            { "fmul.s", i => AssembleFpRType(i, Fpu.FMUL_S) },
-            { "fdiv.s", i => AssembleFpRType(i, Fpu.FDIV_S) },
-            { "fsqrt.s", i => AssembleFpRS1(i, Fpu.FSQRT_S) },
+            { "fadd.s", i => new[] { AssembleFpRType(i, Fpu.FADD_S) } },
+            { "fsub.s", i => new[] { AssembleFpRType(i, Fpu.FSUB_S) } },
+            { "fmul.s", i => new[] { AssembleFpRType(i, Fpu.FMUL_S) } },
+            { "fdiv.s", i => new[] { AssembleFpRType(i, Fpu.FDIV_S) } },
+            { "fsqrt.s", i => new[] { AssembleFpRS1(i, Fpu.FSQRT_S) } },
 
             // fused multiply-add (4 operands): rd, rs1, rs2, rs3[, rm]
-            { "fmadd.s",  i => AssembleFpR4(i, Opcodes.MADD) },
-            { "fmsub.s",  i => AssembleFpR4(i, Opcodes.MSUB) },
-            { "fnmsub.s", i => AssembleFpR4(i, Opcodes.NMSUB) },
-            { "fnmadd.s", i => AssembleFpR4(i, Opcodes.NMADD) },
+            { "fmadd.s",  i => new[] { AssembleFpR4(i, Opcodes.MADD) } },
+            { "fmsub.s",  i => new[] { AssembleFpR4(i, Opcodes.MSUB) } },
+            { "fnmsub.s", i => new[] { AssembleFpR4(i, Opcodes.NMSUB) } },
+            { "fnmadd.s", i => new[] { AssembleFpR4(i, Opcodes.NMADD) } },
 
             // moves and converts (simplified)
-            { "fmv.x.w", i => AssembleFpMove(i, toInt:true) },
-            { "fmv.w.x", i => AssembleFpMove(i, toInt:false) },
+            { "fmv.x.w", i => new[] { AssembleFpMove(i, toInt:true) } },
+            { "fmv.w.x", i => new[] { AssembleFpMove(i, toInt:false) } },
         };
     }
 
-    public IReadOnlyDictionary<string, Func<Instruction, uint>> GetHandlers() => _handlers;
+    public IReadOnlyDictionary<string, Func<Instruction, IEnumerable<uint>>> GetHandlers() => _handlers;
 
     private uint AssembleLoadStore(Instruction instruction, bool isLoad, uint funct3)
     {

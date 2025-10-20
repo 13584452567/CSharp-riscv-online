@@ -5,43 +5,43 @@ namespace RiscVAssembler.Assembler;
 
 public class RvaAssembler : IRiscVAssemblerModule
 {
-    private readonly Dictionary<string, Func<Instruction, uint>> _handlers;
+    private readonly Dictionary<string, Func<Instruction, IEnumerable<uint>>> _handlers;
 
     public RvaAssembler()
     {
-        _handlers = new(StringComparer.OrdinalIgnoreCase)
+    _handlers = new(StringComparer.OrdinalIgnoreCase)
         {
             // lr/sc
-            { "lr.w",  i => AssembleAmo(i, funct5:0b00010, aq:false, rl:false, funct3:0b010, rs2Zero:true) },
-            { "sc.w",  i => AssembleAmo(i, funct5:0b00011, aq:false, rl:false, funct3:0b010) },
-            { "lr.d",  i => AssembleAmo(i, funct5:0b00010, aq:false, rl:false, funct3:0b011, rs2Zero:true) },
-            { "sc.d",  i => AssembleAmo(i, funct5:0b00011, aq:false, rl:false, funct3:0b011) },
+            { "lr.w",  i => new[] { AssembleAmo(i, funct5:0b00010, aq:false, rl:false, funct3:0b010, rs2Zero:true) } },
+            { "sc.w",  i => new[] { AssembleAmo(i, funct5:0b00011, aq:false, rl:false, funct3:0b010) } },
+            { "lr.d",  i => new[] { AssembleAmo(i, funct5:0b00010, aq:false, rl:false, funct3:0b011, rs2Zero:true) } },
+            { "sc.d",  i => new[] { AssembleAmo(i, funct5:0b00011, aq:false, rl:false, funct3:0b011) } },
 
             // amoxxx.w
-            { "amoswap.w", i => AssembleAmo(i, 0b00001, false, false, 0b010) },
-            { "amoadd.w",  i => AssembleAmo(i, 0b00000, false, false, 0b010) },
-            { "amoxor.w",  i => AssembleAmo(i, 0b00100, false, false, 0b010) },
-            { "amoand.w",  i => AssembleAmo(i, 0b01100, false, false, 0b010) },
-            { "amoor.w",   i => AssembleAmo(i, 0b01000, false, false, 0b010) },
-            { "amomin.w",  i => AssembleAmo(i, 0b10000, false, false, 0b010) },
-            { "amomax.w",  i => AssembleAmo(i, 0b10100, false, false, 0b010) },
-            { "amominu.w", i => AssembleAmo(i, 0b11000, false, false, 0b010) },
-            { "amomaxu.w", i => AssembleAmo(i, 0b11100, false, false, 0b010) },
+            { "amoswap.w", i => new[] { AssembleAmo(i, 0b00001, false, false, 0b010) } },
+            { "amoadd.w",  i => new[] { AssembleAmo(i, 0b00000, false, false, 0b010) } },
+            { "amoxor.w",  i => new[] { AssembleAmo(i, 0b00100, false, false, 0b010) } },
+            { "amoand.w",  i => new[] { AssembleAmo(i, 0b01100, false, false, 0b010) } },
+            { "amoor.w",   i => new[] { AssembleAmo(i, 0b01000, false, false, 0b010) } },
+            { "amomin.w",  i => new[] { AssembleAmo(i, 0b10000, false, false, 0b010) } },
+            { "amomax.w",  i => new[] { AssembleAmo(i, 0b10100, false, false, 0b010) } },
+            { "amominu.w", i => new[] { AssembleAmo(i, 0b11000, false, false, 0b010) } },
+            { "amomaxu.w", i => new[] { AssembleAmo(i, 0b11100, false, false, 0b010) } },
 
             // amoxxx.d
-            { "amoswap.d", i => AssembleAmo(i, 0b00001, false, false, 0b011) },
-            { "amoadd.d",  i => AssembleAmo(i, 0b00000, false, false, 0b011) },
-            { "amoxor.d",  i => AssembleAmo(i, 0b00100, false, false, 0b011) },
-            { "amoand.d",  i => AssembleAmo(i, 0b01100, false, false, 0b011) },
-            { "amoor.d",   i => AssembleAmo(i, 0b01000, false, false, 0b011) },
-            { "amomin.d",  i => AssembleAmo(i, 0b10000, false, false, 0b011) },
-            { "amomax.d",  i => AssembleAmo(i, 0b10100, false, false, 0b011) },
-            { "amominu.d", i => AssembleAmo(i, 0b11000, false, false, 0b011) },
-            { "amomaxu.d", i => AssembleAmo(i, 0b11100, false, false, 0b011) },
+            { "amoswap.d", i => new[] { AssembleAmo(i, 0b00001, false, false, 0b011) } },
+            { "amoadd.d",  i => new[] { AssembleAmo(i, 0b00000, false, false, 0b011) } },
+            { "amoxor.d",  i => new[] { AssembleAmo(i, 0b00100, false, false, 0b011) } },
+            { "amoand.d",  i => new[] { AssembleAmo(i, 0b01100, false, false, 0b011) } },
+            { "amoor.d",   i => new[] { AssembleAmo(i, 0b01000, false, false, 0b011) } },
+            { "amomin.d",  i => new[] { AssembleAmo(i, 0b10000, false, false, 0b011) } },
+            { "amomax.d",  i => new[] { AssembleAmo(i, 0b10100, false, false, 0b011) } },
+            { "amominu.d", i => new[] { AssembleAmo(i, 0b11000, false, false, 0b011) } },
+            { "amomaxu.d", i => new[] { AssembleAmo(i, 0b11100, false, false, 0b011) } },
         };
     }
 
-    public IReadOnlyDictionary<string, Func<Instruction, uint>> GetHandlers() => _handlers;
+    public IReadOnlyDictionary<string, Func<Instruction, IEnumerable<uint>>> GetHandlers() => _handlers;
 
     private static uint AssembleAmo(Instruction i, uint funct5, bool aq, bool rl, uint funct3, bool rs2Zero=false)
     {

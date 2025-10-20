@@ -7,55 +7,55 @@ namespace RiscVAssembler.Assembler;
 // Minimal RVC assembler: encodes a practical subset matching our RVC disassembler mappings.
 public class RvcAssembler : IRiscVAssemblerModule
 {
-    private readonly Dictionary<string, Func<Instruction, uint>> _handlers;
+    private readonly Dictionary<string, Func<Instruction, IEnumerable<uint>>> _handlers;
 
     public RvcAssembler()
     {
-        _handlers = new(StringComparer.OrdinalIgnoreCase)
+    _handlers = new(StringComparer.OrdinalIgnoreCase)
         {
             // Quadrant 0
-            { "c.addi4spn", AssembleCAddi4Spn },
-            { "c.lw", AssembleCLw },
-            { "c.sw", AssembleCSw },
-            { "c.ld", AssembleCLd },
-            { "c.sd", AssembleCSd },
+            { "c.addi4spn", i => new[] { AssembleCAddi4Spn(i) } },
+            { "c.lw", i => new[] { AssembleCLw(i) } },
+            { "c.sw", i => new[] { AssembleCSw(i) } },
+            { "c.ld", i => new[] { AssembleCLd(i) } },
+            { "c.sd", i => new[] { AssembleCSd(i) } },
 
             // Quadrant 1
-            { "c.nop", AssembleCNoOpOrAddi },
-            { "c.addi", AssembleCNoOpOrAddi },
-            { "c.li", AssembleCLi },
-            { "c.lui", AssembleCLuiOrAddi16Sp },
-            { "c.addi16sp", AssembleCLuiOrAddi16Sp },
-            { "c.srli", AssembleCShiftAndLogic },
-            { "c.srai", AssembleCShiftAndLogic },
-            { "c.andi", AssembleCShiftAndLogic },
-            { "c.sub", AssembleCArith },
-            { "c.xor", AssembleCArith },
-            { "c.or", AssembleCArith },
-            { "c.and", AssembleCArith },
-            { "c.addiw", AssembleCAddiw },
-            { "c.addw", AssembleCArithW },
-            { "c.subw", AssembleCArithW },
-            { "c.j", AssembleCJ },
-            { "c.jal", AssembleCJ },
-            { "c.beqz", AssembleCBeqzBnez },
-            { "c.bnez", AssembleCBeqzBnez },
+            { "c.nop", i => new[] { AssembleCNoOpOrAddi(i) } },
+            { "c.addi", i => new[] { AssembleCNoOpOrAddi(i) } },
+            { "c.li", i => new[] { AssembleCLi(i) } },
+            { "c.lui", i => new[] { AssembleCLuiOrAddi16Sp(i) } },
+            { "c.addi16sp", i => new[] { AssembleCLuiOrAddi16Sp(i) } },
+            { "c.srli", i => new[] { AssembleCShiftAndLogic(i) } },
+            { "c.srai", i => new[] { AssembleCShiftAndLogic(i) } },
+            { "c.andi", i => new[] { AssembleCShiftAndLogic(i) } },
+            { "c.sub", i => new[] { AssembleCArith(i) } },
+            { "c.xor", i => new[] { AssembleCArith(i) } },
+            { "c.or", i => new[] { AssembleCArith(i) } },
+            { "c.and", i => new[] { AssembleCArith(i) } },
+            { "c.addiw", i => new[] { AssembleCAddiw(i) } },
+            { "c.addw", i => new[] { AssembleCArithW(i) } },
+            { "c.subw", i => new[] { AssembleCArithW(i) } },
+            { "c.j", i => new[] { AssembleCJ(i) } },
+            { "c.jal", i => new[] { AssembleCJ(i) } },
+            { "c.beqz", i => new[] { AssembleCBeqzBnez(i) } },
+            { "c.bnez", i => new[] { AssembleCBeqzBnez(i) } },
 
             // Quadrant 2
-            { "c.slli", AssembleCSlli },
-            { "c.lwsp", AssembleCLwSp },
-            { "c.swsp", AssembleCSwSp },
-            { "c.ldsp", AssembleCLdSp },
-            { "c.sdsp", AssembleCSdSp },
-            { "c.jr", AssembleCJrJalrMvAdd },
-            { "c.jalr", AssembleCJrJalrMvAdd },
-            { "c.mv", AssembleCJrJalrMvAdd },
-            { "c.add", AssembleCJrJalrMvAdd },
-            { "c.ebreak", AssembleCEbreak },
+            { "c.slli", i => new[] { AssembleCSlli(i) } },
+            { "c.lwsp", i => new[] { AssembleCLwSp(i) } },
+            { "c.swsp", i => new[] { AssembleCSwSp(i) } },
+            { "c.ldsp", i => new[] { AssembleCLdSp(i) } },
+            { "c.sdsp", i => new[] { AssembleCSdSp(i) } },
+            { "c.jr", i => new[] { AssembleCJrJalrMvAdd(i) } },
+            { "c.jalr", i => new[] { AssembleCJrJalrMvAdd(i) } },
+            { "c.mv", i => new[] { AssembleCJrJalrMvAdd(i) } },
+            { "c.add", i => new[] { AssembleCJrJalrMvAdd(i) } },
+            { "c.ebreak", i => new[] { AssembleCEbreak(i) } },
         };
     }
 
-    public IReadOnlyDictionary<string, Func<Instruction, uint>> GetHandlers() => _handlers;
+    public IReadOnlyDictionary<string, Func<Instruction, IEnumerable<uint>>> GetHandlers() => _handlers;
 
     // Quadrant 1: c.nop / c.addi rd, imm  (funct3=000)
     private static uint AssembleCNoOpOrAddi(Instruction ins)
