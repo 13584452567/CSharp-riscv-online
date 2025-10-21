@@ -39,6 +39,9 @@ public class RvfAssembler : IRiscVAssemblerModule
             // min/max
             { "fmin.s", i => new[] { AssembleFpRTypeGeneric(i, Fpu.FMINMAX_S, 0b000) } },
             { "fmax.s", i => new[] { AssembleFpRTypeGeneric(i, Fpu.FMINMAX_S, 0b001) } },
+            { "feq.s", i => new[] { AssembleFpCompare(i, Fpu.FCMP_S, Fpu.FCMP_EQ) } },
+            { "flt.s", i => new[] { AssembleFpCompare(i, Fpu.FCMP_S, Fpu.FCMP_LT) } },
+            { "fle.s", i => new[] { AssembleFpCompare(i, Fpu.FCMP_S, Fpu.FCMP_LE) } },
             // conversions
             { "fcvt.w.s",  i => new[] { AssembleFpCvti(i, Fpu.FCVT_W_S, isUnsigned:false) } },
             { "fcvt.wu.s", i => new[] { AssembleFpCvti(i, Fpu.FCVT_W_S, isUnsigned:true) } },
@@ -78,9 +81,9 @@ public class RvfAssembler : IRiscVAssemblerModule
             { "fcvt.s.l",  i => new[] { AssembleFpCvtsToSFrom64(i, Fpu.FCVT_D_L, isFromUnsigned:false) } },
             { "fcvt.s.lu", i => new[] { AssembleFpCvtsToSFrom64(i, Fpu.FCVT_D_L, isFromUnsigned:true) } },
             // comparisons
-            { "feq.d", i => new[] { AssembleFpCompare(i, Fpu.FCMP_EQ) } },
-            { "flt.d", i => new[] { AssembleFpCompare(i, Fpu.FCMP_LT) } },
-            { "fle.d", i => new[] { AssembleFpCompare(i, Fpu.FCMP_LE) } },
+            { "feq.d", i => new[] { AssembleFpCompare(i, Fpu.FCMP_D, Fpu.FCMP_EQ) } },
+            { "flt.d", i => new[] { AssembleFpCompare(i, Fpu.FCMP_D, Fpu.FCMP_LT) } },
+            { "fle.d", i => new[] { AssembleFpCompare(i, Fpu.FCMP_D, Fpu.FCMP_LE) } },
             // 64-bit integer conversions
             { "fcvt.l.d",  i => new[] { AssembleFpCvti64(i, Fpu.FCVT_L_D, isUnsigned:false) } },
             { "fcvt.lu.d", i => new[] { AssembleFpCvti64(i, Fpu.FCVT_L_D, isUnsigned:true) } },
@@ -161,11 +164,18 @@ public class RvfAssembler : IRiscVAssemblerModule
 
     private static (uint rs1, int imm) ParseMem(string op)
     {
-        var m = Regex.Match(op, @"(-?\d+)\(x(\d+)\)");
-        if (!m.Success) throw new ArgumentException($"Invalid mem op: {op}");
-        int imm = int.Parse(m.Groups[1].Value);
-        uint rs1 = uint.Parse(m.Groups[2].Value);
-        if (rs1>31) throw new ArgumentException();
+        int open = op.IndexOf('(');
+        int close = op.IndexOf(')', Math.Max(open + 1, 0));
+        if (open < 0 || close < 0 || close <= open + 1)
+            throw new ArgumentException($"Invalid mem op: {op}");
+
+        string immToken = op[..open].Trim();
+        string baseToken = op.Substring(open + 1, close - open - 1).Trim();
+        if (string.IsNullOrWhiteSpace(baseToken))
+            throw new ArgumentException($"Invalid mem op (missing base register): {op}");
+
+        int imm = string.IsNullOrWhiteSpace(immToken) ? 0 : ParseImmediate(immToken);
+        uint rs1 = ParseGpr(baseToken);
         return (rs1, imm);
     }
 
@@ -198,6 +208,17 @@ public class RvfAssembler : IRiscVAssemblerModule
             "s8"=>24,"s9"=>25,"s10"=>26,"s11"=>27,
             "t3"=>28,"t4"=>29,"t5"=>30,"t6"=>31,
             _=>throw new ArgumentException($"Unknown reg {s}")};
+    }
+
+    private static int ParseImmediate(string text)
+    {
+        text = text.Trim().ToLowerInvariant();
+        if (text.Length == 0) return 0;
+        if (text.StartsWith("-0x")) return -Convert.ToInt32(text[3..], 16);
+        if (text.StartsWith("+0x")) return Convert.ToInt32(text[3..], 16);
+        if (text.StartsWith("0x")) return Convert.ToInt32(text, 16);
+        if (int.TryParse(text, out int value)) return value;
+        throw new ArgumentException($"Invalid immediate: {text}");
     }
 
     // Generic FP R-type assembler for operations which use OP_FP with funct7 and a funct3 selector in rm
@@ -299,7 +320,7 @@ public class RvfAssembler : IRiscVAssemblerModule
         return InstructionBuilder.BuildFpRType(Fpu.FCLASS_D, 0, rd, rs1, 0, 0);
     }
 
-    private static uint AssembleFpCompare(Instruction i, uint selector)
+    private static uint AssembleFpCompare(Instruction i, uint funct7, uint selector)
     {
         // form: feq.d rd, fs1, fs2
         if (i.Operands.Length < 3) throw new ArgumentException("FP compare requires rd, fs1, fs2");
@@ -307,7 +328,7 @@ public class RvfAssembler : IRiscVAssemblerModule
         uint rs1 = ParseFpr(i.Operands[1]);
         uint rs2 = ParseFpr(i.Operands[2]);
         // place selector in funct3/rm-like field
-        return InstructionBuilder.BuildFpRType(Fpu.FSGNJ_D, selector, rd, rs1, rs2, 0);
+        return InstructionBuilder.BuildFpRType(funct7, selector, rd, rs1, rs2, 0);
     }
 
     private static uint AssembleFpCvti64(Instruction i, uint funct7, bool isUnsigned)

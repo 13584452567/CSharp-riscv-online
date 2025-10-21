@@ -178,12 +178,18 @@ public class Rv64iAssembler : IRiscVAssemblerModule
 
     private (uint register, int offset) ParseMemoryOperand(string operand)
     {
-        var match = Regex.Match(operand, @"(-?\d+)\(x(\d+)\)");
-        if (!match.Success)
+        int open = operand.IndexOf('(');
+        int close = operand.IndexOf(')', Math.Max(open + 1, 0));
+        if (open < 0 || close < 0 || close <= open + 1)
             throw new ArgumentException($"Invalid memory operand format: {operand}.");
-        int offset = int.Parse(match.Groups[1].Value);
-        uint register = uint.Parse(match.Groups[2].Value);
-        if (register > 31) throw new ArgumentException($"Invalid register x{register}");
+
+        string offsetToken = operand[..open].Trim();
+        string regToken = operand.Substring(open + 1, close - open - 1).Trim();
+        if (regToken.Length == 0)
+            throw new ArgumentException($"Missing base register in operand {operand}");
+
+        int offset = string.IsNullOrWhiteSpace(offsetToken) ? 0 : ParseImmediate(offsetToken);
+        uint register = ParseRegister(regToken);
         return (register, offset);
     }
 
@@ -212,6 +218,8 @@ public class Rv64iAssembler : IRiscVAssemblerModule
     private int ParseImmediate(string imm)
     {
         imm = imm.ToLower();
+        if (imm.StartsWith("-0x")) return -Convert.ToInt32(imm[3..], 16);
+        if (imm.StartsWith("+0x")) return Convert.ToInt32(imm[3..], 16);
         if (imm.StartsWith("0x")) return Convert.ToInt32(imm, 16);
         if (int.TryParse(imm, out int v)) return v;
         throw new ArgumentException($"Invalid immediate: {imm}");

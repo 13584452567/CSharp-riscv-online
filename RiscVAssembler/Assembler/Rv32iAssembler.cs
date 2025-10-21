@@ -520,35 +520,24 @@ public class Rv32iAssembler : IRiscVAssemblerModule
         yield return InstructionBuilder.BuildIType(Opcodes.JALR, 0b000, rd, rs1, imm);
     }
 
-    private uint AssembleJType(Instruction instruction)
-    {
-        if (instruction.Operands.Length != 2)
-            throw new ArgumentException("JAL instruction requires 2 operands.");
-
-        uint rd = ParseRegister(instruction.Operands[0]);
-        int imm = ParseImmediate(instruction.Operands[1]); // Typically a label
-
-        return InstructionBuilder.BuildJType(Opcodes.JAL, rd, imm);
-    }
-
     #endregion
 
     #region Parsers
 
     private (uint register, int offset) ParseMemoryOperand(string operand)
     {
-        // Support both xN and ABI names inside parentheses, e.g., 4(x2) or 4(sp)
-        var match = Regex.Match(operand, @"(-?\d+)\(([^)]+)\)");
-        if (!match.Success)
+        int open = operand.IndexOf('(');
+        int close = operand.IndexOf(')', Math.Max(open + 1, 0));
+        if (open < 0 || close < 0 || close <= open + 1)
             throw new ArgumentException($"Invalid memory operand format: '{operand}'. Expected 'offset(reg)'. Examples: 0(x0), 4(sp), 8(s0).");
 
-        var offsetStr = match.Groups[1].Value;
-        if (!int.TryParse(offsetStr, out int offset))
-            throw new ArgumentException($"Invalid offset value '{offsetStr}' in memory operand '{operand}'. Expected a signed integer, e.g., -4, 0, 16.");
+        string offsetToken = operand[..open].Trim();
+        string regToken = operand.Substring(open + 1, close - open - 1).Trim();
 
-        string regToken = match.Groups[2].Value.Trim();
         if (string.IsNullOrWhiteSpace(regToken))
             throw new ArgumentException($"Missing register in memory operand '{operand}'. Use x0..x31 or ABI names (zero, ra, sp, gp, tp, t0..t6, s0/fp..s11, a0..a7).");
+
+        int offset = string.IsNullOrWhiteSpace(offsetToken) ? 0 : ParseImmediate(offsetToken);
 
         try
         {

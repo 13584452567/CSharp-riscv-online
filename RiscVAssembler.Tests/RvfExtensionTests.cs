@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using FluentAssertions;
 using RiscVAssembler.Assembler;
@@ -29,6 +30,38 @@ public class RvfExtensionTests
         var rs1 = uint.Parse(parts[2].TrimEnd(',').TrimStart('f'));
         var rs2 = uint.Parse(parts[3].TrimStart('f'));
         var expected = InstructionBuilder.BuildFpRType(funct7, sel, rd, rs1, rs2, 0);
+        words[0].Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("feq.s x1, f2, f3", Fpu.FCMP_S, Fpu.FCMP_EQ)]
+    [InlineData("flt.s x4, f5, f6", Fpu.FCMP_S, Fpu.FCMP_LT)]
+    [InlineData("fle.s x7, f8, f9", Fpu.FCMP_S, Fpu.FCMP_LE)]
+    public void FpCompareS_Encodes(string asm, uint funct7, uint selector)
+    {
+        var words = Assemble(asm);
+        words.Length.Should().Be(1);
+        var tokens = asm.Replace(",", "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        uint rd = uint.Parse(tokens[1].TrimStart('x'));
+        uint rs1 = uint.Parse(tokens[2].TrimStart('f'));
+        uint rs2 = uint.Parse(tokens[3].TrimStart('f'));
+        var expected = InstructionBuilder.BuildFpRType(funct7, selector, rd, rs1, rs2, 0);
+        words[0].Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("feq.d x10, f11, f12", Fpu.FCMP_D, Fpu.FCMP_EQ)]
+    [InlineData("flt.d x13, f14, f15", Fpu.FCMP_D, Fpu.FCMP_LT)]
+    [InlineData("fle.d x16, f17, f18", Fpu.FCMP_D, Fpu.FCMP_LE)]
+    public void FpCompareD_Encodes(string asm, uint funct7, uint selector)
+    {
+        var words = Assemble(asm);
+        words.Length.Should().Be(1);
+        var tokens = asm.Replace(",", "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        uint rd = uint.Parse(tokens[1].TrimStart('x'));
+        uint rs1 = uint.Parse(tokens[2].TrimStart('f'));
+        uint rs2 = uint.Parse(tokens[3].TrimStart('f'));
+        var expected = InstructionBuilder.BuildFpRType(funct7, selector, rd, rs1, rs2, 0);
         words[0].Should().Be(expected);
     }
 

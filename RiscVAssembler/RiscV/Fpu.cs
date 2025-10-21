@@ -16,6 +16,7 @@ public static class Fpu
     public const uint FMV_X_W  = 0b1110000; // funct3=000, rs2=00000
     public const uint FMV_W_X  = 0b1111000; // funct3=000, rs2=00000
     public const uint FCLASS_S = 0b1110000; // fclass.s (funct7)
+    public const uint FCMP_S   = 0b1010000; // feq/flt/fle (rm selects op)
 
     // OP_FP funct7 encodings for double-precision (D) - mirror S with distinct codes
     public const uint FADD_D  = 0b0000001;
@@ -30,6 +31,7 @@ public static class Fpu
     public const uint FMV_X_D  = 0b1110001;
     public const uint FMV_D_X  = 0b1111001;
     public const uint FCLASS_D = 0b1110001;
+    public const uint FCMP_D   = 0b1010001;
 
     // FP conversions between single and double (assumed funct7 values)
     // These follow the project's pattern of 'D' variants being odd vs 'S' even.
