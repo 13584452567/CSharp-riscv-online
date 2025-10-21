@@ -27,15 +27,7 @@ public class Rv32iAssembler : IRiscVAssemblerModule
             { "sra", i => new[] { AssembleRType(i, 0b101, 0b0100000) } },
             { "or", i => new[] { AssembleRType(i, 0b110, 0b0000000) } },
             { "and", i => new[] { AssembleRType(i, 0b111, 0b0000000) } },
-            // M-extension (multiply/divide/remainder) funct7 = 0b0000001
-            { "mul",     i => new[] { AssembleRType(i, 0b000, 0b0000001) } },
-            { "mulh",    i => new[] { AssembleRType(i, 0b001, 0b0000001) } },
-            { "mulhsu",  i => new[] { AssembleRType(i, 0b010, 0b0000001) } },
-            { "mulhu",   i => new[] { AssembleRType(i, 0b011, 0b0000001) } },
-            { "div",     i => new[] { AssembleRType(i, 0b100, 0b0000001) } },
-            { "divu",    i => new[] { AssembleRType(i, 0b101, 0b0000001) } },
-            { "rem",     i => new[] { AssembleRType(i, 0b110, 0b0000001) } },
-            { "remu",    i => new[] { AssembleRType(i, 0b111, 0b0000001) } },
+            // M-extension handled by RvmAssembler (centralized implementation)
 
             // I-Type (OP_IMM)
             { "addi", i => new[] { AssembleIType(i, Opcodes.OP_IMM, 0b000) } },
@@ -190,6 +182,14 @@ public class Rv32iAssembler : IRiscVAssemblerModule
                     uint rd = ParseRegister(i.Operands[0]);
                     uint rs = ParseRegister(i.Operands[1]);
                     return new[] { InstructionBuilder.BuildRType(Opcodes.OP, 0b010, 0b0000000, rd, 0, rs) };
+                }
+            },
+            // zext.b rd, rs -> andi rd, rs, 0xFF
+            { "zext.b", i => {
+                    if (i.Operands.Length != 2) throw new ArgumentException("zext.b requires rd, rs");
+                    uint rd = ParseRegister(i.Operands[0]);
+                    uint rs = ParseRegister(i.Operands[1]);
+                    return new[] { InstructionBuilder.BuildIType(Opcodes.OP_IMM, 0b111, rd, rs, 0xFF) };
                 }
             },
             // push rs -> addi sp, sp, -4 ; sw rs, 0(sp)
@@ -579,23 +579,20 @@ public class Rv32iAssembler : IRiscVAssemblerModule
 
     private static int ParseImmediate(string imm)
     {
-        imm = imm.ToLower();
-        if (imm.StartsWith("-0x"))
-        {
-            return -Convert.ToInt32(imm[3..], 16);
-        }
-        if (imm.StartsWith("+0x"))
-        {
-            return Convert.ToInt32(imm[3..], 16);
-        }
-        if (imm.StartsWith("0x"))
-        {
-            return Convert.ToInt32(imm, 16);
-        }
-        if (int.TryParse(imm, out int value))
-        {
+        imm = imm.Trim();
+        // Try resolving as symbol/label first
+        if (AssemblySymbols.Symbols != null && AssemblySymbols.TryResolve(imm, out var symVal))
+            return symVal;
+
+        var lower = imm.ToLower();
+        if (lower.StartsWith("-0x"))
+            return -Convert.ToInt32(lower[3..], 16);
+        if (lower.StartsWith("+0x"))
+            return Convert.ToInt32(lower[3..], 16);
+        if (lower.StartsWith("0x"))
+            return Convert.ToInt32(lower, 16);
+        if (int.TryParse(lower, out int value))
             return value;
-        }
         throw new ArgumentException($"Invalid immediate value: {imm}");
     }
 

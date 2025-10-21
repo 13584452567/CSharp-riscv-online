@@ -37,11 +37,68 @@ public class UnifiedAssembler
 
     public IEnumerable<uint> Assemble(string code)
     {
-        var lines = code.Split(new[] { '\n', ';' }, StringSplitOptions.RemoveEmptyEntries)
-                        .Select(l => l.Trim())
-                        .Where(l => !string.IsNullOrWhiteSpace(l));
-        foreach (var line in lines)
+        // Two-pass assembly:
+        // Pass 1: collect labels and estimate addresses (PC in bytes)
+        // Pass 2: assemble with symbol resolution
+        var rawLines = code.Split(new[] { '\n', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                          .Select(l => l.Trim())
+                          .Where(l => !string.IsNullOrWhiteSpace(l))
+                          .ToList();
+
+        // First pass: build symbol table
+        AssemblySymbols.Symbols = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        int pc = 0; // byte address
+        var multiWordPseudos = new[] { "li", "la", "call", "tail", "push", "pop", "pushm", "popm" };
+
+        foreach (var line in rawLines)
         {
+            // label definition: ends with ':'
+            if (line.EndsWith(":"))
+            {
+                var label = line[..^1].Trim();
+                if (!string.IsNullOrWhiteSpace(label)) AssemblySymbols.Symbols[label] = pc;
+                continue;
+            }
+
+            var ins = Instruction.Parse(line);
+            string lookup = ins.Mnemonic.ToLower();
+            // atomic suffix strip
+            if (lookup.EndsWith(".aq")) lookup = lookup[..^3];
+            if (lookup.EndsWith(".rl")) lookup = lookup[..^3];
+
+            // Estimate length (in bytes) conservatively for pseudos that may expand
+            if (multiWordPseudos.Contains(lookup))
+            {
+                // heuristics: if immediate operand is numeric and fits 12-bit -> 4 bytes, else assume 8 bytes
+                bool likelyOneWord = false;
+                if ((lookup == "li" || lookup == "la" || lookup == "call" || lookup == "tail") && ins.Operands.Length >= 1)
+                {
+                    var op = ins.Operands.Last();
+                    if (int.TryParse(op, out var v) || (op.StartsWith("0x") && int.TryParse(op.Substring(2), System.Globalization.NumberStyles.HexNumber, null, out v)))
+                    {
+                        if (v >= -2048 && v <= 2047) likelyOneWord = true;
+                    }
+                }
+                if (likelyOneWord) pc += 4; else pc += 8;
+            }
+            else
+            {
+                // default assume single 32-bit word
+                pc += 4;
+            }
+        }
+
+        // Second pass: assemble with symbol resolution
+        AssemblySymbols.CurrentPc = 0;
+        AssemblySymbols.TreatLabelAsRelative = false;
+        foreach (var line in rawLines)
+        {
+            if (line.EndsWith(":"))
+            {
+                // label only
+                continue;
+            }
+
             var insn = Instruction.Parse(line);
             // Allow suffixes like .aq and .rl on atomic mnemonics by stripping them for lookup
             string lookup = insn.Mnemonic.ToLower();
@@ -54,8 +111,12 @@ public class UnifiedAssembler
             }
             if (_handlers.TryGetValue(lookup, out var fn))
             {
-                foreach (var word in fn(insn))
+                // before calling handler, set current PC (in bytes)
+                AssemblySymbols.CurrentPc = AssemblySymbols.CurrentPc; // keep current
+                var emitted = fn(insn).ToArray();
+                foreach (var word in emitted)
                     yield return word;
+                AssemblySymbols.CurrentPc += emitted.Length * 4;
             }
             else
                 throw new NotSupportedException($"Instruction '{insn.Mnemonic}' not supported.");

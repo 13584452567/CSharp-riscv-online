@@ -15,11 +15,8 @@ namespace RiscVAssembler.Assembler
 
         private static IEnumerable<uint> AssembleV(Instruction instruction)
         {
-            // This is a placeholder. A real implementation would parse operands and build the instruction word.
-            // For example, for vle32.v vd, (rs1), vm
-            // This is a VL-format instruction.
-            // For simplicity, we'll just return a fixed value.
-            yield return 0x00257557; // vle32.v v10, (x10), v0.t
+            // Placeholder: RVV not yet implemented. Throw to avoid returning incorrect encodings.
+            throw new NotSupportedException("RVV instructions are not yet implemented by the assembler.");
         }
     }
 }

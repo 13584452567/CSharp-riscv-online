@@ -214,6 +214,10 @@ public class RvfAssembler : IRiscVAssemblerModule
     {
         text = text.Trim().ToLowerInvariant();
         if (text.Length == 0) return 0;
+
+        // First try resolving labels or numeric tokens via the global symbol table
+        if (AssemblySymbols.TryResolve(text, out var resolved)) return resolved;
+
         if (text.StartsWith("-0x")) return -Convert.ToInt32(text[3..], 16);
         if (text.StartsWith("+0x")) return Convert.ToInt32(text[3..], 16);
         if (text.StartsWith("0x")) return Convert.ToInt32(text, 16);

@@ -30,75 +30,27 @@ public class Rv64iAssembler : IRiscVAssemblerModule
             { "srlw",  i => new[] { AssembleRTypeW(i, 0b101, 0b0000000) } },
             { "sraw",  i => new[] { AssembleRTypeW(i, 0b101, 0b0100000) } },
 
+            // Pseudo instructions specific to RV64I word operations
+            { "negw", i => {
+                    if (i.Operands.Length != 2) throw new ArgumentException("negw requires rd, rs");
+                    uint rd = ParseRegister(i.Operands[0]);
+                    uint rs = ParseRegister(i.Operands[1]);
+                    return new[] { InstructionBuilder.BuildRType(Opcodes.OP_32, 0b000, 0b0100000, rd, 0, rs) };
+                }
+            },
+            { "sext.w", i => {
+                    if (i.Operands.Length != 2) throw new ArgumentException("sext.w requires rd, rs");
+                    uint rd = ParseRegister(i.Operands[0]);
+                    uint rs = ParseRegister(i.Operands[1]);
+                    return new[] { InstructionBuilder.BuildIType(Opcodes.OP_IMM_32, 0b000, rd, rs, 0) };
+                }
+            },
+
             // 64-bit loads/stores
             { "ld", i => new[] { AssembleLoadStore(i, isLoad:true,  funct3:0b011) } },
             { "sd", i => new[] { AssembleLoadStore(i, isLoad:false, funct3:0b011) } },
             { "lwu", i => new[] { AssembleLwu(i) } },
-            // M-extension (RV64) - same function codes as RV32 M-extension (funct7 = 0b0000001, opcode = OP)
-            { "mul",    i => {
-                    if (i.Operands.Length != 3) throw new ArgumentException("mul requires rd, rs1, rs2");
-                    uint rd = ParseRegister(i.Operands[0]);
-                    uint rs1 = ParseRegister(i.Operands[1]);
-                    uint rs2 = ParseRegister(i.Operands[2]);
-                    return new[] { InstructionBuilder.BuildRType(Opcodes.OP, 0b000, 0b0000001, rd, rs1, rs2) };
-                }
-            },
-            { "mulh",   i => {
-                    if (i.Operands.Length != 3) throw new ArgumentException("mulh requires rd, rs1, rs2");
-                    uint rd = ParseRegister(i.Operands[0]);
-                    uint rs1 = ParseRegister(i.Operands[1]);
-                    uint rs2 = ParseRegister(i.Operands[2]);
-                    return new[] { InstructionBuilder.BuildRType(Opcodes.OP, 0b001, 0b0000001, rd, rs1, rs2) };
-                }
-            },
-            { "mulhsu", i => {
-                    if (i.Operands.Length != 3) throw new ArgumentException("mulhsu requires rd, rs1, rs2");
-                    uint rd = ParseRegister(i.Operands[0]);
-                    uint rs1 = ParseRegister(i.Operands[1]);
-                    uint rs2 = ParseRegister(i.Operands[2]);
-                    return new[] { InstructionBuilder.BuildRType(Opcodes.OP, 0b010, 0b0000001, rd, rs1, rs2) };
-                }
-            },
-            { "mulhu",  i => {
-                    if (i.Operands.Length != 3) throw new ArgumentException("mulhu requires rd, rs1, rs2");
-                    uint rd = ParseRegister(i.Operands[0]);
-                    uint rs1 = ParseRegister(i.Operands[1]);
-                    uint rs2 = ParseRegister(i.Operands[2]);
-                    return new[] { InstructionBuilder.BuildRType(Opcodes.OP, 0b011, 0b0000001, rd, rs1, rs2) };
-                }
-            },
-            { "div",    i => {
-                    if (i.Operands.Length != 3) throw new ArgumentException("div requires rd, rs1, rs2");
-                    uint rd = ParseRegister(i.Operands[0]);
-                    uint rs1 = ParseRegister(i.Operands[1]);
-                    uint rs2 = ParseRegister(i.Operands[2]);
-                    return new[] { InstructionBuilder.BuildRType(Opcodes.OP, 0b100, 0b0000001, rd, rs1, rs2) };
-                }
-            },
-            { "divu",   i => {
-                    if (i.Operands.Length != 3) throw new ArgumentException("divu requires rd, rs1, rs2");
-                    uint rd = ParseRegister(i.Operands[0]);
-                    uint rs1 = ParseRegister(i.Operands[1]);
-                    uint rs2 = ParseRegister(i.Operands[2]);
-                    return new[] { InstructionBuilder.BuildRType(Opcodes.OP, 0b101, 0b0000001, rd, rs1, rs2) };
-                }
-            },
-            { "rem",    i => {
-                    if (i.Operands.Length != 3) throw new ArgumentException("rem requires rd, rs1, rs2");
-                    uint rd = ParseRegister(i.Operands[0]);
-                    uint rs1 = ParseRegister(i.Operands[1]);
-                    uint rs2 = ParseRegister(i.Operands[2]);
-                    return new[] { InstructionBuilder.BuildRType(Opcodes.OP, 0b110, 0b0000001, rd, rs1, rs2) };
-                }
-            },
-            { "remu",   i => {
-                    if (i.Operands.Length != 3) throw new ArgumentException("remu requires rd, rs1, rs2");
-                    uint rd = ParseRegister(i.Operands[0]);
-                    uint rs1 = ParseRegister(i.Operands[1]);
-                    uint rs2 = ParseRegister(i.Operands[2]);
-                    return new[] { InstructionBuilder.BuildRType(Opcodes.OP, 0b111, 0b0000001, rd, rs1, rs2) };
-                }
-            },
+            // M-extension handled by RvmAssembler (centralized implementation)
         };
     }
 
@@ -217,11 +169,15 @@ public class Rv64iAssembler : IRiscVAssemblerModule
 
     private int ParseImmediate(string imm)
     {
-        imm = imm.ToLower();
-        if (imm.StartsWith("-0x")) return -Convert.ToInt32(imm[3..], 16);
-        if (imm.StartsWith("+0x")) return Convert.ToInt32(imm[3..], 16);
-        if (imm.StartsWith("0x")) return Convert.ToInt32(imm, 16);
-        if (int.TryParse(imm, out int v)) return v;
+        imm = imm.Trim();
+        if (AssemblySymbols.Symbols != null && AssemblySymbols.TryResolve(imm, out var symVal))
+            return symVal;
+
+        var lower = imm.ToLower();
+        if (lower.StartsWith("-0x")) return -Convert.ToInt32(lower[3..], 16);
+        if (lower.StartsWith("+0x")) return Convert.ToInt32(lower[3..], 16);
+        if (lower.StartsWith("0x")) return Convert.ToInt32(lower, 16);
+        if (int.TryParse(lower, out int v)) return v;
         throw new ArgumentException($"Invalid immediate: {imm}");
     }
 }

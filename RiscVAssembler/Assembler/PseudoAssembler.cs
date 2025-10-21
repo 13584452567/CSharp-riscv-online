@@ -61,15 +61,18 @@ namespace RiscVAssembler.Assembler
         private IEnumerable<uint> AssembleRet(Instruction instruction) => new Rv32iAssembler().GetHandlers()["jalr"](Instruction.Parse("jalr x0, x1, 0"));
         private IEnumerable<uint> AssembleCall(Instruction instruction)
         {
-            // Simplified
-            yield return new Rv32iAssembler().GetHandlers()["auipc"](Instruction.Parse($"auipc x1, 0")).GetEnumerator().Current;
-            yield return new Rv32iAssembler().GetHandlers()["jalr"](Instruction.Parse($"jalr x1, x1, 0")).GetEnumerator().Current;
+            // Simplified but robust: materialize the sequences returned by underlying handlers
+            var auipcSeq = new Rv32iAssembler().GetHandlers()["auipc"](Instruction.Parse($"auipc x1, 0"));
+            foreach (var w in auipcSeq) yield return w;
+            var jalrSeq = new Rv32iAssembler().GetHandlers()["jalr"](Instruction.Parse($"jalr x1, x1, 0"));
+            foreach (var w in jalrSeq) yield return w;
         }
         private IEnumerable<uint> AssembleTail(Instruction instruction)
         {
-            // Simplified
-            yield return new Rv32iAssembler().GetHandlers()["auipc"](Instruction.Parse($"auipc x6, 0")).GetEnumerator().Current;
-            yield return new Rv32iAssembler().GetHandlers()["jalr"](Instruction.Parse($"jalr x0, x6, 0")).GetEnumerator().Current;
+            var auipcSeq = new Rv32iAssembler().GetHandlers()["auipc"](Instruction.Parse($"auipc x6, 0"));
+            foreach (var w in auipcSeq) yield return w;
+            var jalrSeq = new Rv32iAssembler().GetHandlers()["jalr"](Instruction.Parse($"jalr x0, x6, 0"));
+            foreach (var w in jalrSeq) yield return w;
         }
     }
 }
